@@ -1,0 +1,33 @@
+# R1-A1 runtime configuration
+# The brain talks to any OpenAI/Ollama-compatible endpoint — swap
+# base_url/model to move between host boards without code changes.
+
+brain:
+  base_url: "http://localhost:11434"
+  model: "qwen2.5:3b"
+  fallback_model: "gemma2:2b"
+  vision_model: "moondream:latest"
+
+interconnect:
+  port: "/dev/ttyACM0"
+  baud: 115200
+  heartbeat_interval_s: 1.0
+
+motion:
+  track_width_m: 0.42
+  wheel_diameter_m: 0.152
+  estop_budget_ms: 100
+
+thermal:
+  throttle_c: 75
+  shutdown_c: 85
+  battery_stop_c: 50
+  fan_count: 5
+
+power:
+  seek_charger_soc_pct: 20
+  meters_per_soc_pct: 12
+
+audio:
+  sample_rate: 16000
+  chirp_set: "classic"
