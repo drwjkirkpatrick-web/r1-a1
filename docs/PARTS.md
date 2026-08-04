@@ -99,9 +99,14 @@ https://www.printed-droid.com/kb/choosing-a-3d-printer-for-astromech-droids/
 54. `speaker_baffle.stl` — sealed 0.5 L enclosure for 4Ω driver
 55. `hdmi_splitter_bracket.stl`, `cable_combs.stl`, `wire_clips_2020.stl`
 56. `thermal_probe_clips.stl` — DS18B20 mounts for compute/motor bays
+57. `vision_node_tray.stl` — Jetson Orin Nano mount on dome inner ring,
+    with CSI ribbon channel to the eye bezel
+58. `mmwave_brackets.stl` ×3 — LD2450 radar pods at skirt FL/FR/rear
+59. `ultrasonic_pods.stl` ×4 — HC-SR04P under-skirt mounts at 45° spacing
+60. `cliff_sensor_clips.stl` ×3 — VL53L1X downward mounts at skirt edge
 
 ## Skirt (bottom body) (5 parts)
-57. Skirt segments ×4 + front skirt access flap (Baddeley "R2D2 Skirt ver 2"
+61. Skirt segments ×4 + front skirt access flap (Baddeley "R2D2 Skirt ver 2"
     on Thingiverse)
 
 ---

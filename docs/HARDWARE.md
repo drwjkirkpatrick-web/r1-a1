@@ -64,8 +64,12 @@ endpoint, so any of the three works by changing one config line.
 | Drive motors | 2× 24V 250W geared DC scooter motors + Cytron MD30C drivers, in feet | PWM+dir from MCU |
 | Center leg lift (2-3-2 mode) | Linear actuator, 150 mm stroke, 24V | Relay/H-bridge from MCU |
 | IMU | BNO085 9-DOF, UART | MCU |
-| Thermal | 2× DS18B20 (compute bay, motor bay) + host internal sensors | OneWire → MCU; host `sensors` |
+| Thermal | 3× DS18B20 (compute bay, motor bay, vision node heatsink) + host internal sensors | OneWire → MCU; host `sensors` |
 | Battery monitor | INA219 on main bus | I2C → MCU |
+| mmWave presence | 3× Hi-Link LD2450 24 GHz human-tracking radar (front-left, front-right skirt + rear) | UART → USB-serial hub → host |
+| Ultrasonic ring | 4× HC-SR04P at 45°/135°/225°/315° under skirt | GPIO trig/echo → MCU |
+| Cliff sensors | 3× VL53L1X ToF pointing down under skirt edge | I2C (addr-muxed) → MCU |
+| Vision node | Jetson Orin Nano 8 GB in dome (dedicated vision LLM) | GbE via slip-ring → host |
 | E-stop | Latching red mushroom on rear access panel + soft e-stop on RC link | Hardwired motor-power cut; GPIO to MCU |
 
 ---
@@ -142,6 +146,38 @@ must move air deliberately.
   smaller model (fallback model config).
 - Any zone > 85 °C → graceful inference shutdown, mobility stays live.
 - Battery > 50 °C → full stop, charge-inhibit, audible alert.
+
+---
+
+### Vision Node (dome-mounted, dedicated vision LLM)
+- **Board:** Jetson Orin Nano 8 GB dev module (or Orin Nano Super), mounted
+  in the dome/head beside the eye assembly
+- **Role:** dedicated vision-language inference so the main brain host
+  never stalls on camera frames. Runs the vision LLM (moondream2 or
+  Qwen2.5-VL-3B GGUF via llama.cpp / jetson-containers), face detection,
+  and OCR for the eye.
+- **Why separate:** vision inference is bursty and memory-hungry; on the
+  shared host it would evict the chat LLM's KV cache and stutter speech.
+  A dedicated 8 GB node keeps the eye pipeline at a steady ~5–10 fps
+  caption / ~15 fps detect without touching the brain's context.
+- **Link to host:** gigabit Ethernet over the dome slip-ring
+  (1000BASE-T pair on the slip-ring capsule). Vision node exposes a tiny
+  HTTP API (`POST /caption`, `POST /detect`) consumed by `src/eye/camera.py`
+  — the `vlm_client` injection point already supports a remote callable.
+- **Power:** 5 V/4 A buck from the 12 V rail; ~7–15 W typical, 25 W peak.
+- **Thermal:** 60 mm dome fan already specified pulls air across its
+  heatsink; DS18B20 probe clipped to the SoC heatsink reports into the
+  thermal policy as a fourth zone (`vision_c`).
+- **Failover:** if the vision node is unreachable, `EyeCamera.caption()`
+  falls back to the brain host's own (slower) vision model — same API.
+
+| Vision node spec | Value |
+|---|---|
+| SoC | Jetson Orin Nano 8 GB (102 GB/s, 40 TOPS sparse INT8) |
+| Vision model | moondream2 (fast caption) + Qwen2.5-VL-3B (detail/OCR) |
+| Camera | IMX477 via CSI-2 direct on the Jetson (bypasses USB3 bridge — shorter path); USB3 bridge version kept as spare |
+| API | HTTP :8081 — `/caption`, `/detect`, `/ocr`, `/health` |
+| Mount | 3D-printed `vision_node_tray.stl` on dome inner ring, ribbon CSI through eye bezel |
 
 ---
 

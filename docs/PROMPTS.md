@@ -53,7 +53,17 @@ behavior each prompt exercises. Format: prompt → expected module path.
 38. "Should you go charge now?" → `power.should_seek_charger()` policy
 39. "Shut your brain down but keep your wheels alive." → host soft-off via MCU relay
 
+## Spatial Awareness (the 8 upgrades)
+43. "Is a person nearby?" → `awareness.mmwave.human_present()` (LD2450 radar, works in the dark)
+44. "How close is the nearest obstacle?" → `awareness.fusion` nearest across mmWave + ultrasonic
+45. "Watch out, there's a step." → `awareness.cliff.is_cliff()` + forced stop
+46. "Which way is safest to turn?" → `awareness.cliff.safest_turn()`
+47. "Hold this heading straight." → `awareness.pose` IMU/odometry complementary filter
+48. "Slow down near the furniture." → `awareness.proximity` zone policy scales drive speed
+49. "Remember this room's layout." → `awareness.occupancy` grid with confidence decay
+50. "Follow that person at one meter." → `motion.refine.follow_target()` mmWave-tracked pursuit
+
 ## System & Meta
-40. "Run a full self-check." → `interconnect.selftest` all links green
-41. "Which of your sensors is not responding?" → health matrix diff
-42. "Reboot your brain and come back online cleanly." → service restart + re-handshake within 30 s
+51. "Run a full self-check." → `interconnect.selftest` all links green
+52. "Which of your sensors is not responding?" → health matrix diff
+53. "Reboot your brain and come back online cleanly." → service restart + re-handshake within 30 s

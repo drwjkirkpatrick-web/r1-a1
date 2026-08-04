@@ -10,6 +10,7 @@ from .drive import Drive, EstopTimeoutError
 from .dome import Dome, DomeToleranceError
 from .center_leg import CenterLeg
 from .express import Express
+from .refine import MovementRefiner
 
 __all__ = [
     "Drive",
@@ -18,4 +19,5 @@ __all__ = [
     "DomeToleranceError",
     "CenterLeg",
     "Express",
+    "MovementRefiner",
 ]

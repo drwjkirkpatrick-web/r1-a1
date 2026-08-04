@@ -16,6 +16,13 @@ internal mini PC running Ubuntu.
   2B model) with conversation memory and meta-prompt routing
 - 👁 **Single eye** — 12 MP dome camera with face tracking, OCR, and
   vision-LLM captioning, plus an RGB "wink" illuminator
+- 🛰 **Vision node** — dedicated Jetson Orin Nano in the head running the
+  vision LLM (moondream2 / Qwen2.5-VL) over gigabit slip-ring link, so
+  the brain never stalls on camera frames
+- 📡 **Spatial awareness** — 8 upgrades: mmWave human tracking (sees in
+  the dark), ultrasonic ring, cliff sensors, IMU+odometry pose fusion,
+  ego-centric occupancy grid, proximity speed policy, one-call sensor
+  fusion, and awareness-refined movement with detours + pursuit
 - 🖥 **Wink screen** — 5″ round front logic display for expressions,
   gauges, and scrolling text
 - 📽 **Projector** — dome periscope projector with brightness control
@@ -28,13 +35,16 @@ internal mini PC running Ubuntu.
   and charger-seek policy
 - 🔗 **Interconnect** — CRC-checked JSON-lines serial link between the
   brain host and the real-time MCU, with a full selftest
+- ⚙️ **Firmware** — complete Teensy 4.1 sketch: interrupt-driven e-stop,
+  CRC-validated command dispatch, unsolicited safety telemetry
 
 ## Layout
 
 ```
 src/
   brain/        LLM client, memory, prompt-routing agent
-  motion/       drive, dome, center leg, expressive gaits
+  motion/       drive, dome, center leg, expressive gaits + awareness refiner
+  awareness/    mmWave, ultrasonic, cliff, pose, occupancy, proximity, fusion
   eye/          dome camera + wink illuminator
   display/      front logic screen
   projector/    periscope projector
@@ -42,12 +52,13 @@ src/
   power/        battery monitor + range policy
   audio/        speaker/chirps + mic array
   interconnect/ host↔MCU serial link + selftest
-tests/          full pytest suite (hardware-mocked)
+firmware/       Teensy 4.1 MCU sketch (r1a1_mcu.ino) + pin map
+tests/          full pytest suite (hardware-mocked, 164 tests)
 docs/
-  HARDWARE.md   compute bay, interconnect map, cooling, chassis
+  HARDWARE.md   compute bay, vision node, interconnect map, cooling, chassis
   PARTS.md      complete 3D-printed parts list with design links
   BUILD.md      phase-by-phase assembly instructions
-  PROMPTS.md    42 acceptance prompts (testable behaviors)
+  PROMPTS.md    53 acceptance prompts (testable behaviors)
 ```
 
 ## Quick start
