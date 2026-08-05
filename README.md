@@ -1,15 +1,17 @@
 # R1-A1
 
-![Version](https://img.shields.io/badge/version-0.3.0-blue)
-![Tests](https://img.shields.io/badge/tests-195%20passing-brightgreen)
+![Version](https://img.shields.io/badge/version-0.4.0-blue)
+![Tests](https://img.shields.io/badge/tests-254%20passing-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.12+-yellow)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Modules](https://img.shields.io/badge/modules-41-orange)
-![Lines](https://img.shields.io/badge/code-3.9K_LoC-informational)
+![Modules](https://img.shields.io/badge/modules-50-orange)
+![Lines](https://img.shields.io/badge/code-7.6K_LoC-informational)
 ![Brain](https://img.shields.io/badge/brain-Ollama%20%7C%20MLX%20%7C%20CUDA-purple)
 ![Dashboard](https://img.shields.io/badge/dashboard-:9298-teal)
 ![Firmware](https://img.shields.io/badge/firmware-Teensy%204.1-darkslategray)
 ![Build Tiers](https://img.shields.io/badge/build%20tiers-3%20(Economy%20%7C%20Standard%20%7C%20Deluxe)-indigo)
+![Astro](https://img.shields.io/badge/astro-nav%20%7C%20solar%20system%20%7C%20star%20catalog-blueviolet)
+![Repair](https://img.shields.io/badge/repair-spacecraft%20framework-firebrick)
 
 A self-contained, LLM-driven astromech robot — brain, body, and voice.
 
@@ -25,6 +27,14 @@ internal mini PC running Ubuntu.
 
 - 🧠 **Local brain** — Ollama-hosted LLM (primary 3B model, fallback
   2B model) with conversation memory and meta-prompt routing
+- 🌟 **Astro navigation** — celestial coordinate conversion, solar
+  system body tracking (real Keplerian orbits), 50+ star catalog with
+  real data, Milky Way structure, and a live data bridge to NASA JPL
+  Horizons and SIMBAD
+- 🔧 **Spacecraft repair framework** — extensible diagnostic engine
+  with a spacecraft registry (X-Wing, TIE Fighter, Millennium Falcon
+  built in), subsystem definitions, failure modes, and repair
+  procedures — add any spacecraft type later
 - 🍎 **Mac Studio M3 Ultra option** — operators can swap to a 512 GB
   Mac Studio M3 Ultra brain via one config line (`host_type: mac_ultra`),
   unlocking 70B+ models at full precision via the MLX backend
@@ -128,6 +138,10 @@ src/
                 + personality.py (remedy bridge)
                 + limbic.py (affective state bridge)
   dashboard/    Flask web dashboard (subsystem + personality + limbic)
+  astro/        celestial navigation, solar system, star catalog,
+                Milky Way structure, astronomical data bridge
+  repair/       spacecraft repair framework: registry, diagnostics,
+                repair procedures (extensible)
   motion/       drive, dome, center leg, expressive gaits + awareness refiner
   awareness/    mmWave, ultrasonic, cliff, pose, occupancy, proximity, fusion
   eye/          dome camera + wink illuminator
@@ -138,12 +152,15 @@ src/
   audio/        speaker/chirps + mic array
   interconnect/ host↔MCU serial link + selftest
 firmware/       Teensy 4.1 MCU sketch (r1a1_mcu.ino) + pin map
-tests/          full pytest suite (hardware-mocked)
+tests/          full pytest suite (hardware-mocked, 254 tests)
 docs/
-  HARDWARE.md   compute bay, vision node, interconnect map, cooling, chassis
-  PARTS.md      complete 3D-printed parts list with design links
-  BUILD.md      phase-by-phase assembly instructions
-  PROMPTS.md    53 acceptance prompts (testable behaviors)
+  HARDWARE.md       compute bay, vision node, interconnect map, cooling, chassis
+  PARTS.md          complete 3D-printed parts list with design links
+  EXTERNAL_PARTS.md community designs, blueprints, 3D print files, suppliers
+  DELUXE_BUILD.md   deluxe build guide integrating external parts
+  BUILD.md          phase-by-phase assembly instructions
+  GAP_ANALYSIS.md   astromech knowledge domain gap analysis
+  PROMPTS.md        53 acceptance prompts (testable behaviors)
 config/
   r1a1.yaml     runtime configuration (brain, personality, limbic, dashboard)
 ```
@@ -164,6 +181,7 @@ python -m src.dashboard.server         # dashboard on :9298
 - [docs/PARTS.md](docs/PARTS.md) — every printed part + metal chassis spec
 - [docs/EXTERNAL_PARTS.md](docs/EXTERNAL_PARTS.md) — community designs, blueprints, 3D print files, and parts suppliers
 - [docs/DELUXE_BUILD.md](docs/DELUXE_BUILD.md) — deluxe build guide integrating external parts and community resources
+- [docs/GAP_ANALYSIS.md](docs/GAP_ANALYSIS.md) — astromech knowledge domain gap analysis
 - [docs/BUILD.md](docs/BUILD.md) — build sequence with safety gates
 - [docs/PROMPTS.md](docs/PROMPTS.md) — 42 acceptance prompts
 
