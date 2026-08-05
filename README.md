@@ -151,6 +151,7 @@ python -m src.dashboard.server         # dashboard on :9298
 
 - [docs/HARDWARE.md](docs/HARDWARE.md) — full hardware architecture
 - [docs/PARTS.md](docs/PARTS.md) — every printed part + metal chassis spec
+- [docs/EXTERNAL_PARTS.md](docs/EXTERNAL_PARTS.md) — community designs, blueprints, 3D print files, and parts suppliers
 - [docs/BUILD.md](docs/BUILD.md) — build sequence with safety gates
 - [docs/PROMPTS.md](docs/PROMPTS.md) — 42 acceptance prompts
 
