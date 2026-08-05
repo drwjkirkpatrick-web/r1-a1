@@ -340,7 +340,7 @@ class TestSpacecraftRegistry(unittest.TestCase):
 
     def setUp(self):
         from repair.registry import SpacecraftRegistry, _build_catalog
-        # Use the built-in catalog (has X-Wing, TIE Fighter, Millennium Falcon)
+        # Use the built-in catalog (has Crew Dragon, Soyuz MS, Space Shuttle)
         self.registry = _build_catalog()
 
     def test_list_spacecraft(self):
@@ -349,9 +349,9 @@ class TestSpacecraftRegistry(unittest.TestCase):
         self.assertGreater(len(ships), 0)
 
     def test_get_known_ship(self):
-        ship = self.registry.get("X-Wing")
+        ship = self.registry.get("Crew Dragon")
         self.assertIsNotNone(ship)
-        self.assertEqual(ship.name, "X-Wing")
+        self.assertEqual(ship.name, "Crew Dragon")
         self.assertGreater(len(ship.subsystems), 0)
 
     def test_get_unknown_ship(self):
@@ -384,7 +384,7 @@ class TestSpacecraftRegistry(unittest.TestCase):
         self.assertIsNotNone(registry.get("TestShip"))
 
     def test_subsystem_has_failure_modes(self):
-        ship = self.registry.get("Millennium Falcon")
+        ship = self.registry.get("Space Shuttle")
         # At least one subsystem should have failure modes defined
         has_modes = any(
             sub.failure_modes for sub in ship.subsystems
@@ -392,7 +392,7 @@ class TestSpacecraftRegistry(unittest.TestCase):
         self.assertTrue(has_modes)
 
     def test_subsystem_has_repair_steps(self):
-        ship = self.registry.get("Millennium Falcon")
+        ship = self.registry.get("Space Shuttle")
         has_steps = any(
             sub.repair_steps for sub in ship.subsystems
         )
@@ -411,7 +411,7 @@ class TestDiagnostics(unittest.TestCase):
         self.engine = DiagnosticEngine(self.registry)
 
     def test_diagnose_returns_dict(self):
-        result = self.engine.diagnose("X-Wing", "Targeting Computer")
+        result = self.engine.diagnose("Crew Dragon", "Draco thrusters")
         self.assertIsInstance(result, dict)
         self.assertIn("status", result)
 
@@ -420,12 +420,12 @@ class TestDiagnostics(unittest.TestCase):
         self.assertIn("unknown", result.get("status", "").lower())
 
     def test_run_all_checks(self):
-        result = self.engine.run_all_checks("X-Wing")
+        result = self.engine.run_all_checks("Crew Dragon")
         self.assertIsInstance(result, dict)
         self.assertIn("subsystems", result)
 
     def test_report_returns_str(self):
-        report = self.engine.report("X-Wing")
+        report = self.engine.report("Crew Dragon")
         self.assertIsInstance(report, str)
         self.assertGreater(len(report), 20)
 
@@ -443,23 +443,23 @@ class TestRepairProcedure(unittest.TestCase):
     def test_repair_procedure_init(self):
         from repair.diagnostics import RepairProcedure
         proc = RepairProcedure(
-            spacecraft_name="X-Wing",
-            subsystem_name="Targeting Computer",
+            spacecraft_name="Crew Dragon",
+            subsystem_name="Draco thrusters",
             steps=["Step 1", "Step 2"],
-            tools_required=["screwdriver", "multimeter"],
+            tools_required=["torque wrench", "borescope"],
             estimated_time_min=30,
             difficulty="moderate",
         )
-        self.assertEqual(proc.spacecraft_name, "X-Wing")
+        self.assertEqual(proc.spacecraft_name, "Crew Dragon")
         self.assertEqual(len(proc.steps), 2)
 
     def test_repair_procedure_execute(self):
         from repair.diagnostics import RepairProcedure
         proc = RepairProcedure(
-            spacecraft_name="X-Wing",
-            subsystem_name="Engine",
-            steps=["Check power", "Replace motivator"],
-            tools_required=["wrench"],
+            spacecraft_name="Crew Dragon",
+            subsystem_name="Draco thrusters",
+            steps=["Check propellant", "Replace valve seals"],
+            tools_required=["torque wrench"],
             estimated_time_min=45,
             difficulty="hard",
         )
@@ -472,7 +472,7 @@ class TestRepairProcedure(unittest.TestCase):
         from repair.registry import _build_catalog
         from repair.diagnostics import RepairProcedure
         registry = _build_catalog()
-        ship = registry.get("Millennium Falcon")
+        ship = registry.get("Space Shuttle")
         self.assertIsNotNone(ship)
         # Find a subsystem with repair steps
         sub = None
@@ -483,7 +483,7 @@ class TestRepairProcedure(unittest.TestCase):
         if sub:
             proc = RepairProcedure.from_subsystem(ship, sub)
             self.assertIsNotNone(proc)
-            self.assertEqual(proc.spacecraft_name, "Millennium Falcon")
+            self.assertEqual(proc.spacecraft_name, "Space Shuttle")
 
 
 if __name__ == "__main__":

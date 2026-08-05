@@ -32,7 +32,7 @@ internal mini PC running Ubuntu.
   real data, Milky Way structure, and a live data bridge to NASA JPL
   Horizons and SIMBAD
 - 🔧 **Spacecraft repair framework** — extensible diagnostic engine
-  with a spacecraft registry (X-Wing, TIE Fighter, Millennium Falcon
+  with a spacecraft registry (Crew Dragon, Soyuz MS, Space Shuttle
   built in), subsystem definitions, failure modes, and repair
   procedures — add any spacecraft type later
 - 🍎 **Mac Studio M3 Ultra option** — operators can swap to a 512 GB

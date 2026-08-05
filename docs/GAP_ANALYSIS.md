@@ -64,12 +64,12 @@ proposes to add now.
 |---|---|---|---|
 | Ship power interfacing | Plugs into ship power sockets | 🟡 Partial | `src/interconnect/` (MCU link, not ship power) |
 | Ship system monitoring | Monitors engine, shield, hull status | 🔴 Gap | — |
-| Starship repair (mechanical) | Fixes hyperdrives, deflector shields | ➕ New | `src/repair/framework.py` |
+| Starship repair (mechanical) | Repairs propulsion, thermal protection | ➕ New | `src/repair/framework.py` |
 | Starship repair (electronic) | Repairs computer circuits, wiring | ➕ New | `src/repair/framework.py` |
 | Diagnostic engine | Runs full system diagnostics | ➕ New | `src/repair/diagnostics.py` |
 | Spacecraft knowledge base | Knows ship types, subsystems, parts | ➕ New | `src/repair/registry.py` |
 | Hull patching | Applies emergency hull repairs | 🔴 Gap | — |
-| Hyperdrive repair | Replaces/calibrates hyperdrive motivators | ➕ Framework | `src/repair/` (extensible) |
+| Hyperdrive repair | Not applicable — real spacecraft propulsion repair | ➕ Framework | `src/repair/` (extensible) |
 | Fire suppression | Extinguishes fires aboard ships | 🔴 Gap | — |
 | Life support management | Monitors and repairs life support | ➕ Framework | `src/repair/` (extensible) |
 

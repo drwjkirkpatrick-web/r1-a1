@@ -263,7 +263,7 @@ class RepairProcedure:
     steps:
         Ordered list of human-readable repair steps.
     tools_required:
-        Tools needed to perform the repair (e.g. ``["magna-scanner", "hydrospanner"]``).
+        Tools needed to perform the repair (e.g. ``["torque wrench", "borescope", "multimeter"]``).
     estimated_time_min:
         Estimated repair time in minutes.
     difficulty:
@@ -353,8 +353,8 @@ class RepairProcedure:
         the classic use of classmethods in Python.  ``cls`` (not the class
         name) is used so subclasses get the right type back.
         """
-        _HARD_CATEGORIES = {"weapons", "propulsion"}
-        _MODERATE_CATEGORIES = {"hull", "shielding", "life_support"}
+        _HARD_CATEGORIES = {"propulsion", "thermal_protection"}
+        _MODERATE_CATEGORIES = {"hull", "payload", "life_support"}
 
         if subsystem.category in _HARD_CATEGORIES:
             difficulty = "hard"
@@ -377,19 +377,17 @@ class RepairProcedure:
 # Helpers
 # ---------------------------------------------------------------------------
 
-#: Default tool sets per category.  A module-level constant so it is defined
-#: once and reused; a dict of lists is fine because we always copy the list
-#: when handing it to a RepairProcedure.
+#: Default tool sets per category.  Real aerospace maintenance tools.
 _TOOLSETS: dict[str, list[str]] = {
-    "propulsion": ["hydrospanner", "plasma torch", "coolant tester"],
-    "life_support": ["atmosphere sampler", "filter wrench", "thermal probe"],
-    "power": ["multitool", "circuit tester", "insulated gloves"],
-    "avionics": ["data probe", "soldering iron", "diagnostic datapad"],
-    "hull": ["magna-scanner", "hull sealant applicator", "riveter"],
-    "weapons": ["boresight tool", "firing servo wrench", "bore-scope"],
-    "shielding": ["shield resonator calibrator", "multitool"],
-    "navigation": ["astrogation datapad", "data probe"],
-    "communications": ["comms analyzer", "soldering iron"],
+    "propulsion": ["torque wrench", "borescope", "propellant leak detector"],
+    "life_support": ["atmosphere sampler", "gas analyzer", "filter wrench"],
+    "power": ["multimeter", "circuit tester", "insulated gloves"],
+    "avionics": ["data probe", "oscilloscope", "signal generator"],
+    "hull": ["laser scanner", "ultrasonic probe", "torque wrench"],
+    "payload": ["torque wrench", "inspection mirror", "feeler gauge"],
+    "thermal_protection": ["thermal imaging camera", "bond-line NDE kit", "laser scanner"],
+    "navigation": ["star tracker calibration target", "data probe"],
+    "communications": ["spectrum analyzer", "RF power meter"],
 }
 
 
