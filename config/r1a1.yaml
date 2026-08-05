@@ -3,10 +3,53 @@
 # base_url/model to move between host boards without code changes.
 
 brain:
+  # Host board — determines recommended model defaults and inference backend.
+  # Options:
+  #   ubuntu_x86  – Minisforum/Beelink Strix Halo, Ubuntu + Ollama (default)
+  #   mac_ultra   – Mac Studio M3 Ultra, MLX backend (512 GB unified memory)
+  #   jetson      – NVIDIA Jetson AGX Orin 64 GB, CUDA + TensorRT-LLM
+  host_type: "ubuntu_x86"
+
   base_url: "http://localhost:11434"
   model: "qwen2.5:3b"
   fallback_model: "gemma2:2b"
   vision_model: "moondream:latest"
+
+  # Mac Studio M3 Ultra overrides (set host_type to mac_ultra to use these).
+  # MLX backend serves Ollama-compatible API via mlx-vlm / mlx-lm server.
+  mac_ultra:
+    base_url: "http://localhost:8080"
+    model: "llama-3.3-70b-instruct-4bit"
+    fallback_model: "llama-3.2-3b-instruct"
+    vision_model: "qwen2-vl-7b-instruct-mlx"
+    inference_backend: "mlx"
+
+  # NVIDIA Jetson AGX Orin overrides.
+  jetson:
+    base_url: "http://localhost:11434"
+    model: "qwen2.5:7b"
+    fallback_model: "qwen2.5:3b"
+    vision_model: "moondream:latest"
+    inference_backend: "ollama"
+
+  # Remedy personality — optional Hermes remedy personality overlay.
+  # When enabled, the agent's system prompt is prepended with a
+  # temperament-specific directive from the 100-remedy database.
+  # See: ~/.hermes/skills/remedy_personality_picker/
+  personality:
+    enabled: false
+    remedy: "bryonia_alba"   # 100 remedies available
+
+  # Limbic system — optional Hermes affective state engine.
+  # When enabled, the agent maintains persistent mood (VAD), neurochemistry,
+  # drives, and expression style across turns. State is saved to disk.
+  # See: ~/projects/limbic-hermes/
+  limbic:
+    enabled: false
+    profile: "pulsatilla_pratensis"   # 52 remedy temperament profiles
+    state_dir: "~/.hermes/limbic_state"
+    intensity: 0.6         # 0.0–0.8, clinical cap at 0.8
+    inject_into_prompt: true
 
 interconnect:
   port: "/dev/ttyACM0"
@@ -31,3 +74,12 @@ power:
 audio:
   sample_rate: 16000
   chirp_set: "classic"
+
+dashboard:
+  enabled: true
+  host: "127.0.0.1"
+  port: 9298
+  refresh_interval_s: 2
+  # When limbic is enabled, the dashboard shows the live affective state
+  # (VAD vector, dominant affect, neurochemistry summary, allostatic load).
+  # When personality is enabled, the active remedy is displayed with emoji.

@@ -1,3 +1,4 @@
 requests>=2.31
 pyserial>=3.5; platform_system != "Darwin"
 pytest>=8.0
+flask>=3.0; extra == "dashboard"

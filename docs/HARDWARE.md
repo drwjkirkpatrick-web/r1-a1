@@ -29,6 +29,28 @@ Two-board architecture: a heavy LLM host plus a real-time microcontroller.
   second-class. Use only if inference quality matters more than robotics
   middleware.
 
+### Option B-Ultra — Mac Studio M3 Ultra (maximum model capacity)
+- **Board:** Mac Studio M3 Ultra, 512 GB unified LPDDR5X, 819 GB/s
+  bandwidth
+- **Why:** 512 GB unified memory — the only board that can hold a
+  full-precision 70B-class model or even a 405B model in 4-bit entirely in
+  GPU-addressable RAM. MLX backend delivers best-in-class tokens/sec per
+  watt for large models. 28-core Neural Engine, 80-core GPU.
+- **Size:** 197 × 197 × 77 mm (larger than Mac mini, but still fits the
+  mid-deck shelf — may need a slightly wider shelf plate).
+- **Power:** 373 W max (AC only — requires inverter stage, see §4).
+  Typical LLM inference load: 120–250 W depending on model size.
+- **Trade-offs:** AC-only input (same inverter requirement as Mac mini
+  option). ROS 2 on macOS is second-class — but with 512 GB of RAM, the
+  brain can run the largest open-weights models locally without any
+  quantization compromise, which may outweigh ROS 2 concerns for a
+  conversational astromech. MLX server exposes an Ollama-compatible API
+  at `localhost:8080` — set `host_type: mac_ultra` in `config/r1a1.yaml`.
+- **Config:** When `host_type: mac_ultra` is set, the brain automatically
+  uses the MLX backend, `localhost:8080` base URL, and recommends
+  `llama-3.3-70b-instruct-4bit` as the primary model with
+  `llama-3.2-3b-instruct` as fallback.
+
 ### Option C — NVIDIA host (CUDA-native)
 - **Board:** Jetson AGX Orin 64 GB dev kit (or AGX Thor if budget allows)
 - **Why:** Full CUDA + TensorRT-LLM, Jetson AI Lab containers, 15–60 W.
@@ -36,9 +58,13 @@ Two-board architecture: a heavy LLM host plus a real-time microcontroller.
 - **Trade-off:** 205 GB/s bandwidth is the lowest of the three; ARM
   ecosystem. Choose this if we want NVIDIA's Isaac/ros2 bridge.
 
-**Decision:** Default build = **Option A (Strix Halo, Ubuntu)**. The code
-in `src/brain/` is host-agnostic — it talks to a local OpenAI-compatible
-endpoint, so any of the three works by changing one config line.
+**Decision:** Default build = **Option A (Strix Halo, Ubuntu)**. For
+operators who need the largest possible models, **Option B-Ultra (Mac
+Studio M3 Ultra)** is the recommended upgrade — 512 GB unified memory
+unlocks 70B+ models at full precision. The code in `src/brain/` is
+host-agnostic — it talks to a local OpenAI/Ollama-compatible endpoint, so
+any of the four options works by changing `host_type` in
+`config/r1a1.yaml`.
 
 ### Real-time companion MCU
 - **Board:** Teensy 4.1 (or Raspberry Pi RP2350 for budget)

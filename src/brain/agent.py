@@ -4,6 +4,10 @@ Composes an LLMClient and a Memory. ``handle(prompt)`` routes meta-prompts
 (model status, model switching, remember/recall, summarization) locally
 WITHOUT hitting the LLM; everything else is forwarded to the LLM and the
 exchange is logged in memory.
+
+Optional PersonalityBridge and LimbicBridge layers may be attached to
+shape the prompt with a remedy temperament and affective state before it
+reaches the LLM. Both degrade gracefully when disabled or unavailable.
 """
 
 from __future__ import annotations
@@ -13,6 +17,8 @@ from typing import Optional
 
 from .llm_client import LLMClient
 from .memory import Memory
+from .personality import PersonalityBridge
+from .limbic import LimbicBridge
 
 _REMEMBER_RE = re.compile(
     r"^remember(?:\s+that)?(?:\s+my)?\s+(.+?)\s+is\s+(.+)$", re.IGNORECASE
@@ -23,15 +29,25 @@ _RECALL_RE = re.compile(
 
 
 class Agent:
-    """Routes user prompts between local meta-commands and the LLM."""
+    """Routes user prompts between local meta-commands and the LLM.
+
+    Optional personality and limbic bridges are injected at construction
+    time. When present and enabled, the personality bridge prepends a
+    temperament directive and the limbic bridge wraps the prompt with
+    affect-aware guidance before the LLM is called.
+    """
 
     def __init__(
         self,
         llm: Optional[LLMClient] = None,
         memory: Optional[Memory] = None,
+        personality: Optional[PersonalityBridge] = None,
+        limbic: Optional[LimbicBridge] = None,
     ) -> None:
         self.llm = llm or LLMClient()
         self.memory = memory or Memory()
+        self.personality = personality
+        self.limbic = limbic
 
     def handle(self, prompt: str) -> str:
         """Handle a user prompt, returning the agent's reply text."""
@@ -77,6 +93,33 @@ class Agent:
 
         # --- Everything else goes to the LLM ---
         self.memory.add_turn("user", text)
-        reply = self.llm.generate(text)
+
+        # Build the full prompt with optional personality + limbic layers.
+        full_prompt = text
+        prefix_parts: list[str] = []
+
+        # Personality bridge: prepend temperament directive.
+        if self.personality is not None:
+            p_prefix = self.personality.get_prompt_prefix()
+            if p_prefix:
+                prefix_parts.append(p_prefix)
+
+        # Combine personality prefix with the user text.
+        if prefix_parts:
+            full_prompt = "\n\n".join(prefix_parts) + "\n\n" + text
+
+        # Limbic bridge: wrap the prompt with affect-aware guidance.
+        if self.limbic is not None:
+            full_prompt = self.limbic.inject_prompt(full_prompt)
+            # Feed the event to the limbic system.
+            self.limbic.observe("user_message", text)
+
+        reply = self.llm.generate(full_prompt)
         self.memory.add_turn("assistant", reply)
+
+        # Feed the reply to the limbic system as a success event.
+        if self.limbic is not None:
+            self.limbic.observe("assistant_reply", reply[:200])
+            self.limbic.update()
+
         return reply
