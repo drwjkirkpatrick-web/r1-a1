@@ -1,5 +1,16 @@
 # R1-A1
 
+![Version](https://img.shields.io/badge/version-0.3.0-blue)
+![Tests](https://img.shields.io/badge/tests-195%20passing-brightgreen)
+![Python](https://img.shields.io/badge/python-3.12+-yellow)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Modules](https://img.shields.io/badge/modules-41-orange)
+![Lines](https://img.shields.io/badge/code-3.9K_LoC-informational)
+![Brain](https://img.shields.io/badge/brain-Ollama%20%7C%20MLX%20%7C%20CUDA-purple)
+![Dashboard](https://img.shields.io/badge/dashboard-:9298-teal)
+![Firmware](https://img.shields.io/badge/firmware-Teensy%204.1-darkslategray)
+![Build Tiers](https://img.shields.io/badge/build%20tiers-3%20(Economy%20%7C%20Standard%20%7C%20Deluxe)-indigo)
+
 A self-contained, LLM-driven astromech robot — brain, body, and voice.
 
 R1-A1 is a full-size rolling companion robot built around a local large
