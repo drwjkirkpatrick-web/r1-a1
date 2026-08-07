@@ -252,6 +252,18 @@ DASHBOARD_HTML = """\
       </div>
     </section>
     <section class='card'>
+      <h2>&#9656; Motion</h2>
+      <div class='card-body' id='motion-body'>
+        <span class='unavailable'>loading...</span>
+      </div>
+    </section>
+    <section class='card'>
+      <h2>&#9656; Hermes Node</h2>
+      <div class='card-body' id='hermes-body'>
+        <span class='unavailable'>loading...</span>
+      </div>
+    </section>
+    <section class='card'>
       <h2>&#9656; Personality</h2>
       <div class='card-body' id='personality-body'>
         <span class='unavailable'>loading...</span>
@@ -383,6 +395,35 @@ DASHBOARD_HTML = """\
           '<span class="unavailable">personality inactive</span>';
       }
 
+      /* Motion */
+      var mo = s.motion || {};
+      if (mo.available) {
+        var mhtml = row('x', (mo.x != null ? mo.x.toFixed(2) + 'm' : '--')) +
+                    row('y', (mo.y != null ? mo.y.toFixed(2) + 'm' : '--')) +
+                    row('heading', (mo.heading_deg != null ? mo.heading_deg.toFixed(0) + '&deg;' : '--'));
+        if (mo.age_s != null) mhtml += row('odo age', mo.age_s.toFixed(1) + 's');
+        mhtml += statusRow(mo.estop_latched ? 'red' : 'green',
+                           mo.estop_latched ? 'E-STOP LATCHED' : 'drive ok');
+        $('motion-body').innerHTML = mhtml;
+      } else {
+        $('motion-body').innerHTML =
+          '<span class="unavailable">motion not wired</span>';
+      }
+
+      /* Hermes node */
+      var hn = s.hermes_node || {};
+      if (hn.available) {
+        var hhtml = row('node', hn.node_id || '?') +
+                    row('endpoint', hn.base_url || '?');
+        if (hn.last_contact_s != null) hhtml += row('contact', hn.last_contact_s.toFixed(1) + 's');
+        hhtml += statusRow(hn.alive ? 'green' : 'red',
+                           hn.alive ? 'node alive' : 'node unreachable');
+        $('hermes-body').innerHTML = hhtml;
+      } else {
+        $('hermes-body').innerHTML =
+          '<span class="unavailable">hermes node not wired</span>';
+      }
+
       /* Limbic — VAD bar visualization */
       var l = s.limbic || {};
       if (l.available) {
@@ -462,6 +503,8 @@ class DashboardServer:
         model tag, ``agent.memory.turns`` / ``agent.memory.facts`` for counts.
         Thermal and power monitors are discovered via ``agent.thermal`` /
         ``agent.power`` (or ``agent.thermal_monitor`` / ``agent.power_monitor``).
+        Motion is discovered via ``agent.drive``; the dome Hermes node via
+        ``agent.hermes_node`` / ``agent.hermes`` / ``agent.subsystems[...]``.
     personality_bridge : object or None
         Anything that exposes remedy info.  Duck-typed via ``get_info()``,
         ``to_dict()``, or direct attributes (``remedy``, ``emoji``,
@@ -480,12 +523,16 @@ class DashboardServer:
         agent: Optional[Any] = None,
         personality_bridge: Optional[Any] = None,
         limbic_bridge: Optional[Any] = None,
+        hermes_node: Optional[Any] = None,
     ) -> None:
         self.host = host
         self.port = port
         self.agent = agent
         self.personality_bridge = personality_bridge
         self.limbic_bridge = limbic_bridge
+        # Learning: the dome node can be passed directly OR discovered on
+        # the agent — direct injection wins so tests never need an agent.
+        self._hermes_node = hermes_node
 
         # Server lifecycle state (populated by run() / cleared by stop())
         self._app = None
@@ -559,6 +606,9 @@ class DashboardServer:
             "host": self._host_state(),
             "thermal": self._thermal_state(),
             "power": self._power_state(),
+            "motion": self._motion_state(),
+            "hermes_node": self._hermes_node_state(),
+            "comms": self._comms_state(),
             "personality": self._personality_state(),
             "limbic": self._limbic_state(),
         }
@@ -608,6 +658,25 @@ class DashboardServer:
                 return jsonify(server._personality_state())
             except Exception as exc:
                 return jsonify({"error": str(exc)}), 500
+
+        @app.route("/api/health")
+        def api_health():
+            """Lightweight liveness endpoint for keep-alive monitors.
+
+            Learning: a watchdog pinging /api/state every second forces
+            a full subsystem sweep; /api/health answers "the web tier is
+            up" without touching any hardware-facing collectors.
+            """
+            return jsonify({
+                "ok": True,
+                "robot": ROBOT_NAME,
+                "version": server._version(),
+                "uptime_s": (
+                    time.time() - server._start_time
+                    if server._start_time is not None
+                    else 0
+                ),
+            })
 
         return app
 
@@ -748,6 +817,67 @@ class DashboardServer:
                 "seek_charger": seek,
                 "voltage_v": voltage_v,
                 "current_a": current_a,
+            }
+        except Exception as exc:
+            return {"available": False, "error": str(exc)}
+
+    def _motion_state(self) -> dict:
+        """Drive odometry and e-stop latch status (if a drive is wired)."""
+        drive = self._find_subsystem("drive")
+        if drive is None:
+            return {"available": False}
+        try:
+            odo = {}
+            if hasattr(drive, "odometry"):
+                odo = drive.odometry()
+            elif hasattr(drive, "odometry_read"):
+                x, y, h = drive.odometry_read()
+                odo = {"x": x, "y": y, "heading_deg": h}
+            latched = bool(getattr(drive, "estop_latched", False))
+            return {
+                "available": True,
+                "x": odo.get("x"),
+                "y": odo.get("y"),
+                "heading_deg": odo.get("heading_deg"),
+                "age_s": odo.get("age_s"),
+                "estop_latched": latched,
+            }
+        except Exception as exc:
+            return {"available": False, "error": str(exc)}
+
+    def _hermes_node_state(self) -> dict:
+        """Dome Hermes agent node reachability and identity."""
+        node = self._hermes_node or self._find_subsystem("hermes_node", "hermes")
+        if node is None:
+            return {"available": False}
+        try:
+            alive = bool(node.is_alive()) if hasattr(node, "is_alive") else False
+            return {
+                "available": True,
+                "alive": alive,
+                "node_id": getattr(node, "node_id", "?"),
+                "base_url": getattr(node, "base_url", "?"),
+                "last_contact_s": getattr(node, "last_contact_s", None),
+            }
+        except Exception as exc:
+            return {"available": False, "error": str(exc)}
+
+    def _comms_state(self) -> dict:
+        """GPS/WAN status from the optional comms stack."""
+        stack = self._find_subsystem("comms", "comms_stack")
+        if stack is None:
+            return {"available": False}
+        try:
+            status = stack.status() if hasattr(stack, "status") else {}
+            gps = status.get("gps") or {}
+            wan = status.get("wan") or {}
+            return {
+                "available": True,
+                "has_fix": bool(gps.get("fix")) if gps else False,
+                "sats": gps.get("sats"),
+                "wan_active": wan.get("active", "offline"),
+                "wifi_ssid": wan.get("wifi_ssid"),
+                "failover": bool(wan.get("failover_active")),
             }
         except Exception as exc:
             return {"available": False, "error": str(exc)}

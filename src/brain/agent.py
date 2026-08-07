@@ -35,7 +35,15 @@ class Agent:
     time. When present and enabled, the personality bridge prepends a
     temperament directive and the limbic bridge wraps the prompt with
     affect-aware guidance before the LLM is called.
+
+    The LLM call itself is wrapped so a dead model server returns a
+    graceful spoken fallback instead of raising through the audio loop.
     """
+
+    # Learning: conversation context window sent to the LLM. Without it
+    # the model sees each utterance in isolation and can't resolve
+    # "what about tomorrow?" — a real wiring gap, not a style choice.
+    CONTEXT_TURNS = 6
 
     def __init__(
         self,
@@ -43,15 +51,19 @@ class Agent:
         memory: Optional[Memory] = None,
         personality: Optional[PersonalityBridge] = None,
         limbic: Optional[LimbicBridge] = None,
+        context_turns: int = CONTEXT_TURNS,
     ) -> None:
         self.llm = llm or LLMClient()
         self.memory = memory or Memory()
         self.personality = personality
         self.limbic = limbic
+        self.context_turns = max(0, int(context_turns))
 
     def handle(self, prompt: str) -> str:
         """Handle a user prompt, returning the agent's reply text."""
         text = prompt.strip()
+        if not text:
+            return "I didn't catch that — say again?"
 
         # --- Meta-prompts (handled locally, LLM is NOT called) ---
 
@@ -104,9 +116,20 @@ class Agent:
             if p_prefix:
                 prefix_parts.append(p_prefix)
 
-        # Combine personality prefix with the user text.
+        # Conversation context: recent turns so the LLM can resolve
+        # references ("it", "that", "what about..."). Excludes the turn
+        # we just appended (it appears as the final line below).
+        context_block = self._context_block()
+
         if prefix_parts:
             full_prompt = "\n\n".join(prefix_parts) + "\n\n" + text
+        if context_block:
+            full_prompt = (
+                (("\n\n".join(prefix_parts) + "\n\n") if prefix_parts else "")
+                + context_block
+                + "\n\n"
+                + text
+            )
 
         # Limbic bridge: wrap the prompt with affect-aware guidance.
         if self.limbic is not None:
@@ -114,7 +137,7 @@ class Agent:
             # Feed the event to the limbic system.
             self.limbic.observe("user_message", text)
 
-        reply = self.llm.generate(full_prompt)
+        reply = self._safe_generate(full_prompt)
         self.memory.add_turn("assistant", reply)
 
         # Feed the reply to the limbic system as a success event.
@@ -123,3 +146,38 @@ class Agent:
             self.limbic.update()
 
         return reply
+
+    # ------------------------------------------------------------------
+    # internals
+    # ------------------------------------------------------------------
+    def _context_block(self) -> str:
+        """Render recent turns as a transcript block for the LLM prompt.
+
+        Returns "" when there is no history or context is disabled.
+        Learning: the user turn for the *current* prompt was already
+        appended to memory, so we drop the last entry to avoid sending
+        it twice (once in context, once as the actual prompt).
+        """
+        if self.context_turns <= 0:
+            return ""
+        turns = list(self.memory.turns)[:-1][-self.context_turns:]
+        if not turns:
+            return ""
+        lines = [f"{role.title()}: {t}" for role, t in turns]
+        return "Conversation so far:\n" + "\n".join(lines)
+
+    def _safe_generate(self, prompt: str) -> str:
+        """Call the LLM; on transport/server failure return a spoken
+        fallback instead of raising through the audio stack.
+
+        Learning: a robot whose voice loop crashes when the model
+        server restarts feels broken in exactly the moment it should
+        feel most alive. We degrade to an honest "thinking" utterance.
+        """
+        try:
+            return self.llm.generate(prompt)
+        except Exception:
+            return (
+                "My thoughts are tangled for a moment — "
+                "give me a second and ask again."
+            )

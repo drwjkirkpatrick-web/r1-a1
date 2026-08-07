@@ -6,10 +6,16 @@ mockable. Reader protocol — ina219_reader() returns either:
     - a float/int: state of charge in percent, or
     - a dict with at least "soc_pct" (and optionally "voltage_v",
       "current_a") for richer telemetry.
+
+Robustness: sensor reads are validated (finite, numeric). A garbage
+read raises ValueError instead of silently clamping into a plausible
+but wrong state — a robot that thinks a dead INA219 means 0% charge
+will drive itself flat trying to reach a charger that isn't needed.
 """
 
 from __future__ import annotations
 
+import math
 from typing import Callable, Union
 
 METERS_PER_SOC_PERCENT = 12.0  # tuned from drive tests; soc × 12 = range in m
@@ -20,14 +26,24 @@ class PowerMonitor:
     def __init__(self, ina219_reader: Callable[[], Union[float, int, dict]]) -> None:
         self._reader = ina219_reader
 
+    @staticmethod
+    def _validate_soc(value: Union[float, int]) -> float:
+        """Coerce a raw SoC reading to a finite float, or raise."""
+        soc = float(value)
+        if not math.isfinite(soc):
+            raise ValueError(f"non-finite SoC reading: {value!r}")
+        return soc
+
     def _raw(self) -> dict:
         """Normalize the reader output to a telemetry dict."""
         reading = self._reader()
         if isinstance(reading, dict):
             data = dict(reading)
         else:
-            data = {"soc_pct": float(reading)}
+            data = {"soc_pct": self._validate_soc(reading)}
         data.setdefault("soc_pct", 0.0)
+        # Validate the dict path too — a dict reader can still lie.
+        data["soc_pct"] = self._validate_soc(data["soc_pct"])
         return data
 
     def telemetry(self) -> dict:

@@ -5,6 +5,8 @@ Usage:
     r1a1 version     — print version
     r1a1 dashboard   — start the web dashboard on :9298
     r1a1 config      — show current config from config/r1a1.yaml
+    r1a1 chat        — interactive REPL with the brain agent
+    r1a1 selftest    — bench link check against the MCU (needs hardware)
 """
 import sys
 
@@ -18,6 +20,11 @@ def doctor() -> int:
         "brain": _check_brain,
         "thermal": _check_thermal,
         "power": _check_power,
+        "motion": _check_motion,
+        "awareness": _check_awareness,
+        "eye": _check_eye,
+        "hermes_node": _check_hermes_node,
+        "comms": _check_comms,
         "personality": _check_personality,
         "limbic": _check_limbic,
         "dashboard": _check_dashboard,
@@ -54,6 +61,47 @@ def _check_thermal() -> str:
 def _check_power() -> str:
     from src.power.monitor import PowerMonitor  # noqa: F401
     return "module OK"
+
+
+def _check_motion() -> str:
+    from src.motion import Drive, Dome, CenterLeg, Express  # noqa: F401
+    return "module OK"
+
+
+def _check_awareness() -> str:
+    from src.awareness.fusion import AwarenessFusion  # noqa: F401
+    try:
+        from src.awareness.watchdog import Watchdog  # noqa: F401
+        return "module OK (fusion + watchdog)"
+    except ImportError:
+        return "module OK (fusion)"
+
+
+def _check_eye() -> str:
+    from src.eye.camera import EyeCamera  # noqa: F401
+    from src.eye.wink import Wink  # noqa: F401
+    return "module OK"
+
+
+def _check_hermes_node() -> str:
+    try:
+        from src.hermesnode import HermesNode  # noqa: F401
+    except ImportError:
+        return "module MISSING (hermesnode not installed)"
+    # Offline probe — doctor never blocks on a network call to the dome
+    # node; we only verify the module imports and can be constructed.
+    node = HermesNode()
+    return f"module OK (node id {node.node_id}, target {node.base_url})"
+
+
+def _check_comms() -> str:
+    try:
+        from src.comms import CommsStack  # noqa: F401
+    except ImportError:
+        return "module MISSING (comms not installed)"
+    stack = CommsStack()
+    wan = stack.wan_status()
+    return f"module OK (wan: {wan['active']})"
 
 
 def _check_personality() -> str:
@@ -106,6 +154,52 @@ def _show_config() -> int:
     return 0
 
 
+def _chat() -> int:
+    """Interactive REPL with the brain agent (Ctrl-D / 'quit' to exit).
+
+    Learning: before this, the only way to exercise the Agent was a
+    unit test or the dashboard — there was no user-facing path to
+    actually talk to the robot from the host shell.
+    """
+    from src.brain.agent import Agent
+
+    agent = Agent()
+    print(f"R1-A1 brain online (model: {agent.llm.current_model()}).")
+    print("Type 'quit' or Ctrl-D to exit.")
+    while True:
+        try:
+            line = input("you> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+        if not line:
+            continue
+        if line.lower() in {"quit", "exit"}:
+            break
+        print(f"r1a1> {agent.handle(line)}")
+    return 0
+
+
+def _selftest() -> int:
+    """Run the interconnect selftest against a live MCU."""
+    from src.interconnect.link import SerialLink
+    from src.interconnect.selftest import run_selftest
+
+    port = "/dev/ttyACM0"
+    if len(sys.argv) > 2:
+        port = sys.argv[2]
+    print(f"Running interconnect selftest on {port} ...")
+    try:
+        with SerialLink(port) as link:
+            results = run_selftest(link)
+    except Exception as exc:
+        print(f"selftest failed to open link: {exc}", file=sys.stderr)
+        return 1
+    for name, ok in results.items():
+        print(f"  {name:>10}: {'PASS' if ok else 'FAIL'}")
+    return 0 if all(results.values()) else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     args = argv if argv is not None else sys.argv[1:]
     if not args or args[0] in {"-h", "--help"}:
@@ -120,6 +214,10 @@ def main(argv: list[str] | None = None) -> int:
         return _start_dashboard()
     if args[0] == "config":
         return _show_config()
+    if args[0] == "chat":
+        return _chat()
+    if args[0] == "selftest":
+        return _selftest()
     print(f"unknown command: {args[0]}", file=sys.stderr)
     return 2
 

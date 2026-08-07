@@ -54,9 +54,24 @@ class Dome:
 
         Supported:
           'confused' — two quick ±45° wags (docs/PROMPTS.md #20).
+          'scan'     — sweep left 90°, right 180°, back to center
+                       (searching-the-room behaviour for "look around").
         """
         if name == "confused":
             for step in (+45.0, -45.0, +45.0, -45.0):
                 self.rotate_deg(step)
+        elif name == "scan":
+            for step in (-90.0, +180.0, -90.0):
+                self.rotate_deg(step)
         else:
             raise ValueError(f"unknown dome expression: {name!r}")
+
+    def center(self):
+        """Return the dome to the 0° home position from the tracked pose.
+
+        Learning: after several relative moves the dome can sit at an
+        arbitrary angle; behaviors that need a known heading (camera
+        capture aligned to drive heading) call center() first instead of
+        accumulating a relative offset chain.
+        """
+        self.rotate_deg(-self.position_deg)

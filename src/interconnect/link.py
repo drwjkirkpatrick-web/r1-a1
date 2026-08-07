@@ -75,6 +75,9 @@ class SerialLink:
         port: str,
         baud: int = DEFAULT_BAUD,
         serial_factory: Optional[Callable[..., Any]] = None,
+        retry_count: int = 0,
+        retry_backoff_s: float = 0.05,
+        sleeper: Callable[[float], None] = time.sleep,
     ) -> None:
         self.port = port
         self.baud = baud
@@ -82,6 +85,14 @@ class SerialLink:
         self._serial = factory(port, baud, 0.0)
         self._seq = 0
         self._rx_buf = bytearray()
+        # Learning: USB CDC on a rolling, vibrating robot drops or
+        # corrupts the occasional frame. A short bounded retry on
+        # transient faults keeps a single glitch from tripping safety
+        # logic, without masking a genuinely dead link (retries are
+        # finite and cheap). Default 0 keeps legacy one-shot behaviour.
+        self.retry_count = max(0, int(retry_count))
+        self.retry_backoff_s = float(retry_backoff_s)
+        self._sleeper = sleeper
 
     # ------------------------------------------------------------------
     # framing
@@ -158,7 +169,35 @@ class SerialLink:
             else:
                 # Nothing available; small sleep to avoid busy-spinning on
                 # real ports (fakes return immediately, this keeps CPU sane).
-                time.sleep(min(0.005, remaining))
+                self._sleeper(min(0.005, remaining))
+
+    # ------------------------------------------------------------------
+    # retry wrapper
+    # ------------------------------------------------------------------
+    def _with_retry(self, fn: Callable[[], Any]) -> Any:
+        """Run ``fn`` with up to ``retry_count`` retries on LinkError.
+
+        Learning: we only retry LinkError subclasses (transient wire
+        faults), never programming errors like TypeError. Backoff is
+        linear and tiny — the safety budget (100 ms e-stop) still
+        dominates; retries must never delay a stop beyond it.
+        """
+        attempts = self.retry_count + 1
+        for attempt in range(attempts):
+            try:
+                return fn()
+            except LinkError:
+                if attempt >= attempts - 1:
+                    raise
+                self._sleeper(self.retry_backoff_s * (attempt + 1))
+
+    def roundtrip(self, cmd: str, payload: Any = None,
+                  timeout: float = DEFAULT_TIMEOUT) -> dict:
+        """Send a command and wait for its reply, with bounded retries."""
+        def _once() -> dict:
+            self.send(cmd, payload)
+            return self.recv(timeout=timeout)
+        return self._with_retry(_once)
 
     # ------------------------------------------------------------------
     # convenience commands

@@ -10,6 +10,7 @@ Eight upgrades over the base bump-switch build:
 6. ``proximity``   — speed-limit policy zones around obstacles
 7. ``fusion``      — one-call sensor refresh + status report
 8. ``motion.refine`` — MovementRefiner: speed scaling, detours, pursuit
+9. ``watchdog``    — liveness supervision: link + sensors → estop escalation
 
 All hardware access is dependency-injected; everything here is testable
 without a robot attached.
@@ -31,4 +32,15 @@ __all__ = [
     "OccupancyGrid",
     "ProximityPolicy",
     "AwarenessFusion",
+    "Watchdog",
 ]
+
+
+def __getattr__(name: str):
+    """Lazy watchdog import so the package loads even if the submodule
+    is absent on a minimal checkout (learning: keep __init__ importable
+    on every build tier; only attribute access pulls the module)."""
+    if name == "Watchdog":
+        from .watchdog import Watchdog
+        return Watchdog
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

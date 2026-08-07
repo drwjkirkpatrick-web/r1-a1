@@ -34,12 +34,17 @@ class ThermalMonitor:
         motor_bay_reader: Callable[[], float],
         battery_reader: Optional[Callable[[], float]] = None,
         fan_tach_reader: Optional[Callable[[int], float]] = None,
+        clock: Optional[Callable[[], float]] = None,
     ) -> None:
         self._host_reader = host_reader
         self._bay_reader = bay_reader
         self._motor_bay_reader = motor_bay_reader
         self._battery_reader = battery_reader
         self._fan_tach_reader = fan_tach_reader
+
+        # Learning: injectable clock so trend tests don't sleep.
+        import time as _time
+        self._clock = clock or _time.monotonic
 
         # Simulated values override live readers (set via simulate()).
         self._sim_temp: Optional[float] = None
@@ -50,6 +55,12 @@ class ThermalMonitor:
         self.shutdown_flag: bool = False
         self.full_stop_flag: bool = False
 
+        # Trend tracking: previous host temp + timestamp, for °C/s rate.
+        self._prev_host_c: Optional[float] = None
+        self._prev_host_ts: Optional[float] = None
+        self._prev2_host_c: Optional[float] = None
+        self._last_host_ts: Optional[float] = None
+
     # ------------------------------------------------------------------
     # Reporting
     # ------------------------------------------------------------------
@@ -57,7 +68,8 @@ class ThermalMonitor:
         """Return current zone temperatures as
         {"host_c": float, "bay_c": float, "motor_bay_c": float}.
 
-        Also evaluates the thermal policy and updates the flags.
+        Also evaluates the thermal policy and updates the flags, and
+        records the host-zone sample for trend tracking.
         """
         if self._sim_temp is not None:
             temps = {
@@ -71,8 +83,34 @@ class ThermalMonitor:
                 "bay_c": float(self._bay_reader()),
                 "motor_bay_c": float(self._motor_bay_reader()),
             }
+        self._record_host_sample(temps["host_c"])
         self._evaluate_policy(temps, self.battery_c())
         return temps
+
+    def _record_host_sample(self, host_c: float) -> None:
+        """Shift the two-sample host-zone history and append ``host_c``."""
+        self._prev2_host_c = self._prev_host_c
+        self._prev_host_c = host_c
+        self._prev_host_ts = self._last_host_ts
+        self._last_host_ts = self._clock()
+
+    def host_rate_c_per_s(self) -> Optional[float]:
+        """Rate of host temperature change in °C/s, or None if unknown.
+
+        Needs at least two samples taken at different times; returns
+        None on the first call (no trend yet). Positive = heating.
+        Learning: predictive throttling — if the host is climbing fast
+        we can drop to the small model *before* crossing 75 °C, instead
+        of reacting after the throttle flag is already latched.
+        """
+        if self._prev_host_c is None or self._prev2_host_c is None:
+            return None
+        if self._prev_host_ts is None or self._last_host_ts is None:
+            return None
+        dt = self._last_host_ts - self._prev_host_ts
+        if dt <= 0:
+            return None
+        return (self._prev_host_c - self._prev2_host_c) / dt
 
     def battery_c(self) -> float:
         """Current battery-bay temperature (0.0 if no reader wired)."""

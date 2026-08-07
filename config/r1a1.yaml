@@ -40,6 +40,16 @@ brain:
     enabled: false
     remedy: "bryonia_alba"   # 100 remedies available
 
+  # LLM keep-alive — warm-model management for the brain host.
+  # Pings the active model on an interval so it stays resident in RAM
+  # (cold 70B loads cause multi-second speech stalls), and auto-falls
+  # back to the small model when the primary stops answering.
+  keepalive:
+    enabled: true
+    ping_interval_s: 30
+    ping_timeout_s: 3
+    max_consecutive_failures: 2
+
   # Limbic system — optional Hermes affective state engine.
   # When enabled, the agent maintains persistent mood (VAD), neurochemistry,
   # drives, and expression style across turns. State is saved to disk.
@@ -55,6 +65,47 @@ interconnect:
   port: "/dev/ttyACM0"
   baud: 115200
   heartbeat_interval_s: 1.0
+  # Resilience: retry transient send/recv faults before declaring the
+  # link down (USB CDC on a rolling robot sees vibration dropouts).
+  retry_count: 2
+  retry_backoff_s: 0.05
+
+# Hermes agent node — hidden Jetson Nano in the dome hosting the Hermes
+# agent layer (personality routing, limbic state, prompt orchestration)
+# as a networked peer. Offloading the agent loop keeps the main brain
+# host's RAM/bandwidth dedicated to LLM inference.
+hermes_node:
+  enabled: true
+  base_url: "http://127.0.0.1:9299"   # dome node over slip-ring GbE
+  node_id: "dome-hermes-01"
+  timeout_s: 5.0
+
+# Subsystem watchdog — periodic liveness supervision of the MCU link
+# and critical sensors, escalating to soft e-stop when they go silent.
+watchdog:
+  enabled: true
+  max_missed_heartbeats: 3
+
+# Brain memory persistence — facts and the last N turns survive restarts.
+memory:
+  persist_path: "~/.r1a1/memory.json"
+  autosave: true
+
+# Optional onboard comms stack — GPS receiver, cellular hotspot
+# failover, and WiFi router. All three are optional hardware add-ons;
+# the code degrades gracefully when any is absent.
+comms:
+  enabled: true
+  gps:
+    enabled: true        # u-blox NEO-M9N over USB/UART
+    device: "/dev/ttyUSB1"
+  cellular:
+    enabled: true        # 4G/5G USB hotspot, WAN failover
+    apn: "wholesale"     # carrier APN
+  wifi:
+    enabled: true        # onboard router — operator's local AP
+    ssid: "r1a1-ops"
+    failover_to_cellular: true
 
 motion:
   track_width_m: 0.42

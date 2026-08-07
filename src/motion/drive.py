@@ -38,6 +38,10 @@ class Drive:
         self._x = 0.0
         self._y = 0.0
         self._heading_deg = 0.0
+        # Learning: timestamp every pose update so downstream consumers
+        # (fusion, logging, dashboard) can tell a fresh odometry fix
+        # from a stale one after a long stop.
+        self._last_update_s = clock()
         self.estop_latched = False
 
     # -- motion -----------------------------------------------------------
@@ -55,12 +59,14 @@ class Drive:
         rad = math.radians(self._heading_deg)
         self._x += meters * math.cos(rad)
         self._y += meters * math.sin(rad)
+        self._last_update_s = self._clock()
 
     def rotate(self, degrees):
         """Rotate in place. Positive = counterclockwise (left)."""
         self._check_latched()
         self.link.send("drive.rotate", {"degrees": float(degrees)})
         self._heading_deg = (self._heading_deg + degrees) % 360.0
+        self._last_update_s = self._clock()
 
     def stop(self):
         """Normal stop. Always allowed, even when e-stop is latched."""
@@ -96,6 +102,19 @@ class Drive:
     def odometry_read(self):
         """Return dead-reckoned pose estimate: (x, y, heading_deg)."""
         return (self._x, self._y, self._heading_deg)
+
+    def odometry_age_s(self) -> float:
+        """Seconds since the last pose update (freshness of the fix)."""
+        return self._clock() - self._last_update_s
+
+    def odometry(self) -> dict:
+        """Pose plus freshness metadata as a dict (dashboard/fusion use)."""
+        return {
+            "x": self._x,
+            "y": self._y,
+            "heading_deg": self._heading_deg,
+            "age_s": self.odometry_age_s(),
+        }
 
     # -- internals --------------------------------------------------------
 

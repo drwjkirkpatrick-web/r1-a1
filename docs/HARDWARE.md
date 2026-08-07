@@ -96,6 +96,10 @@ any of the four options works by changing `host_type` in
 | Ultrasonic ring | 4× HC-SR04P at 45°/135°/225°/315° under skirt | GPIO trig/echo → MCU |
 | Cliff sensors | 3× VL53L1X ToF pointing down under skirt edge | I2C (addr-muxed) → MCU |
 | Vision node | Jetson Orin Nano 8 GB in dome (dedicated vision LLM) | GbE via slip-ring → host |
+| Hermes agent node | Jetson Nano 4 GB (hidden, dome inner ring) hosting the Hermes agent layer | GbE via slip-ring → host |
+| GPS | u-blox NEO-M9N receiver, USB/UART | USB → host |
+| Cellular hotspot | 4G/5G USB modem (Quectel RM520N-GL class), WAN failover | USB → host |
+| WiFi router | GL.iNet-class travel router, onboard AP for operator | GbE → host |
 | E-stop | Latching red mushroom on rear access panel + soft e-stop on RC link | Hardwired motor-power cut; GPIO to MCU |
 
 ---
@@ -103,19 +107,19 @@ any of the four options works by changing `host_type` in
 ## 3. Interconnect Map (full wiring plan)
 
 ```
-                        ┌──────────────────────────────────────┐
-                        │         LLM HOST (Strix Halo)        │
-                        │  Ubuntu 24.04 · Ollama · ROS 2 Jazzy │
-                        └───┬───────┬───────┬──────┬─────┬─────┘
-                 USB3 (eye) │       │ HDMI  │ HDMI │ USB │ USB-C
-                            │       │ (1×2 splitter) │    │  (PD trigger)
-                            ▼       ▼      ▼        ▼    │
-                   ┌────────────┐  ┌─────────┐ ┌────────┐│
-                   │  IMX477    │  │ 5" LCD  │ │ P6X    ││
-                   │  dome eye  │  │ wink    │ │ proj.  ││
-                   └────────────┘  └─────────┘ └────────┘│
-                                                        │
-        ┌───────────────────────────────────────────────┘
+                        ┌──────────────────────────────────────────────┐
+                        │         LLM HOST (Strix Halo)                │
+                        │  Ubuntu 24.04 · Ollama · ROS 2 Jazzy         │
+                        └───┬───────┬───────┬──────┬─────┬──────┬──────┘
+                 USB3 (eye) │       │ HDMI  │ HDMI │ USB │ USB-C│ GbE
+                            │       │ (1×2 splitter) │    │  (PD)│ (slip-ring)
+                            ▼       ▼      ▼        ▼    │      ▼
+                   ┌────────────┐  ┌─────────┐ ┌────────┐│  ┌─────────────────┐
+                   │  IMX477    │  │ 5" LCD  │ │ P6X    ││  │ DOME NODES      │
+                   │  dome eye  │  │ wink    │ │ proj.  ││  │ ├ vision (Orin) │
+                   └────────────┘  └─────────┘ └────────┘│  │ └ hermes (Nano) │
+                                                         │  └─────────────────┘
+        ┌────────────────────────────────────────────────┘
         │ USB CDC 115200 (JSON-lines framed)
         ▼
 ┌────────────────────────────────────────────────────────────────┐
@@ -126,7 +130,7 @@ any of the four options works by changing `host_type` in
 │  Relay 0    ──► center-leg linear actuator H-bridge           │
 │  GPIO       ──► e-stop chain sense, bump switches (front/rear)│
 │  UART2      ──► BNO085 IMU                                    │
-│  OneWire    ──► 2× DS18B20 temp probes                        │
+│  OneWire    ──► 3× DS18B20 temp probes                        │
 │  I2C        ──► INA219 bus power monitor                      │
 │  ADC        ──► panel voltage dividers (aux battery taps)     │
 └────────────────────────────────────────────────────────────────┘
@@ -137,10 +141,19 @@ any of the four options works by changing `host_type` in
 │  2× 24V 20Ah LiFePO4 (series/parallel bus, ~960 Wh)           │
 │   ├── 30 A fuse ──► motor bus (MD30C drivers)                 │
 │   ├── 15 A buck 24→19 V/180 W ──► LLM host DC-in              │
-│   ├── 10 A buck 24→12 V ──► projector, amp, fans              │
-│   ├── 5 A buck 24→5 V ──► MCU, LCD logic, mic, USB hub        │
+│   ├── 10 A buck 24→12 V ──► projector, amp, fans, comms       │
+│   ├── 5 A buck 24→5 V ──► MCU, LCD logic, mic, dome nodes     │
 │   └── charge port (rear panel) ──► 24 V LiFePO4 BMS charger   │
 └────────────────────────────────────────────────────────────────┘
+                        ▲
+        ┌───────────────┼────────────────┐
+        │ USB           │ USB            │ GbE
+        ▼               ▼                ▼
+   ┌─────────┐   ┌────────────┐   ┌──────────┐
+   │ u-blox  │   │ Quectel 5G │   │ GL.iNet  │
+   │ NEO-M9N │   │ cellular   │   │ WiFi AP  │
+   │ GPS     │   │ hotspot    │   │ router   │
+   └─────────┘   └────────────┘   └──────────┘
 ```
 
 **Bus rules**
@@ -204,6 +217,63 @@ must move air deliberately.
 | Camera | IMX477 via CSI-2 direct on the Jetson (bypasses USB3 bridge — shorter path); USB3 bridge version kept as spare |
 | API | HTTP :8081 — `/caption`, `/detect`, `/ocr`, `/health` |
 | Mount | 3D-printed `vision_node_tray.stl` on dome inner ring, ribbon CSI through eye bezel |
+
+---
+
+### Hermes Agent Node (hidden, dome-mounted agent host)
+
+- **Board:** Jetson Nano 4 GB (the older, smaller Nano — *not* the Orin),
+  mounted on the dome inner ring beside the vision node, behind the
+  rear logic display so it's invisible from outside.
+- **Role:** hosts the **Hermes agent layer** — remedy personality
+  routing, limbic affective state, prompt orchestration, and the
+  long-running agent loop — as a *networked peer* to the main brain
+  host. The brain host keeps its RAM and memory bandwidth dedicated to
+  LLM inference; the agent layer's chatter (personality prefix builds,
+  limbic prompt wrapping, memory reads) lives on its own board.
+- **Why separate:** the Hermes agent loop makes frequent small calls
+  (affect updates, memory reads, prefix assembly). On the shared host
+  these compete with the LLM's KV cache and CUDA context; on a 4 GB
+  Nano the whole agent stack fits comfortably (it calls back to the
+  brain host over GbE for actual inference) and the brain host never
+  sees the orchestration overhead.
+- **API:** HTTP :9299 — `/health`, `/state`, `/prompt`, `/personality`,
+  `/limbic`. Consumed by `src/hermesnode/agent_node.py`.
+- **Link:** gigabit Ethernet over the dome slip-ring (shares the
+  vision node's 1000BASE-T capsule via a 2-port slip-ring switch).
+- **Power:** 5 V/3 A buck from the 12 V rail; ~5–10 W typical.
+- **Thermal:** shares the dome 60 mm fan airflow; a fifth DS18B20
+  probe (`hermes_c`) reports into the thermal policy.
+- **Failover:** if the node is unreachable, the brain host runs the
+  personality/limbic bridges locally (the bridges already degrade
+  gracefully — see `src/brain/personality.py`, `src/brain/limbic.py`).
+
+---
+
+### Comms Stack (optional WAN / positioning add-ons)
+
+Three independent, all-optional modules behind `src/comms/`:
+
+| Module | Part | Role |
+|---|---|---|
+| GPS | u-blox NEO-M9N | Global position fix for outdoor ops, astro-nav alignment, and geofenced behaviors |
+| Cellular hotspot | Quectel RM520N-GL 5G USB modem | WAN failover when the WiFi router's uplink drops — keeps the dashboard + remote ops reachable in the field |
+| WiFi router | GL.iNet travel router | Onboard AP (`r1a1-ops`) the operator's phone joins; bridges to venue WiFi or falls back to cellular |
+
+- **Failover policy** (`CommsStack.ensure_wan()`): WiFi is primary;
+  cellular is brought up only when WiFi drops, with a 30 s reconnect
+  cooldown so a flapping uplink doesn't hammer the modem.
+- **GPS** feeds the astro navigation stack (true-north alignment,
+  local sidereal time) and can geofence drive behaviors.
+- **All optional:** every subsystem reports `available=False` when its
+  hardware isn't wired; the robot runs fully offline without them.
+
+| Comms spec | Value |
+|---|---|
+| GPS | u-blox NEO-M9N, USB/UART, 1.5 m CEP |
+| Cellular | Quectel RM520N-GL, 5G sub-6, USB 3.0 |
+| WiFi router | GL.iNet AX1800-class, dual-band AP |
+| API | `src/comms/stack.py` — `CommsStack.status()` |
 
 ---
 
