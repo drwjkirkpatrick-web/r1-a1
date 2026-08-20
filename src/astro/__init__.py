@@ -1,4 +1,6 @@
-"""R1-A1 astro navigation: celestial navigation, solar system body tracking, star catalogs, and astronomical data bridge."""
+"""R1-A1 astro navigation: celestial navigation, solar system body tracking,
+star catalogs, Milky Way structure, astronomical data bridge, exoplanet
+catalog, and exoplanet transit detection."""
 
 # ``Navigation`` is implemented in this module and is always available.
 from .navigation import Navigation
@@ -21,4 +23,20 @@ try:  # pragma: no cover - guarded import for a not-yet-written module
 except ImportError:  # pragma: no cover
     MilkyWay = None  # type: ignore[assignment]
 
-__all__ = ['Navigation', 'SolarSystem', 'StarCatalog', 'MilkyWay', 'AstroBridge']
+# ``ExoplanetCatalog`` queries the NASA Exoplanet Archive TAP API for an
+# up-to-date list of all known exoplanets.  Pure stdlib (lazy ``requests``).
+from .exoplanet_catalog import ExoplanetCatalog
+
+# ``ExoplanetDetector`` runs BLS transit searches on TESS light curves.
+# ``lightkurve`` / ``numpy`` are lazily imported so the module loads without them.
+from .exoplanet import ExoplanetDetector
+
+__all__ = [
+    'Navigation',
+    'SolarSystem',
+    'StarCatalog',
+    'MilkyWay',
+    'AstroBridge',
+    'ExoplanetCatalog',
+    'ExoplanetDetector',
+]

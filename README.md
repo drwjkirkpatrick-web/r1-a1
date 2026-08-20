@@ -1,7 +1,7 @@
 # R1-A1
 
 ![Version](https://img.shields.io/badge/version-0.5.0-blue)
-![Tests](https://img.shields.io/badge/tests-351%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-390%20passing-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.12+-yellow)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Modules](https://img.shields.io/badge/modules-55-orange)
@@ -11,7 +11,7 @@
 ![Dashboard](https://img.shields.io/badge/dashboard-:9298-teal)
 ![Firmware](https://img.shields.io/badge/firmware-Teensy%204.1-darkslategray)
 ![Build Tiers](https://img.shields.io/badge/build%20tiers-3%20(Economy%20%7C%20Standard%20%7C%20Deluxe)-indigo)
-![Astro](https://img.shields.io/badge/astro-nav%20%7C%20solar%20system%20%7C%20star%20catalog-blueviolet)
+![Astro](https://img.shields.io/badge/astro-nav%20%7C%20solar%20%7C%20star%20catalog%20%7C%20exoplanets-blueviolet)
 ![Repair](https://img.shields.io/badge/repair-spacecraft%20framework-firebrick)
 ![Comms](https://img.shields.io/badge/comms-GPS%20%7C%205G%20%7C%20WiFi-yellowgreen)
 
@@ -42,8 +42,10 @@ running the Hermes agent layer as a networked peer.
   restarts via atomic JSON snapshot (`~/.r1a1/memory.json`)
 - 🌟 **Astro navigation** — celestial coordinate conversion, solar
   system body tracking (real Keplerian orbits), 50+ star catalog with
-  real data, Milky Way structure, and a live data bridge to NASA JPL
-  Horizons and SIMBAD
+  real data, Milky Way structure, a live data bridge to NASA JPL
+  Horizons and SIMBAD, **exoplanet catalog** (live NASA Exoplanet
+  Archive with 5,000+ confirmed planets), and **exoplanet transit
+  detection** (BLS on TESS light curves)
 - 🔧 **Spacecraft repair framework** — extensible diagnostic engine
   with a spacecraft registry (Crew Dragon, Soyuz MS, Space Shuttle
   built in), subsystem definitions, failure modes, and repair
@@ -156,6 +158,109 @@ shows live VAD bars, dominant affect, and allostatic load. Requires the
 
 ## Optional comms stack
 
+## Exoplanet suite
+
+The astro package includes two exoplanet modules that give R1-A1 access
+to every known exoplanet and the ability to detect new ones from TESS
+data. Both follow the project's fail-safe patterns: HTTPS-only,
+never-raise, injectable transport, lazy heavy imports.
+
+### Exoplanet catalog (`src/astro/exoplanet_catalog.py`)
+
+Queries the [NASA Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/)
+TAP API for a live, up-to-date list of all confirmed exoplanets — over
+5,000 and growing. The archive is the source of truth, and a local
+SQLite mirror can be downloaded for offline resilience (see below).
+
+```python
+from astro.exoplanet_catalog import ExoplanetCatalog
+
+catalog = ExoplanetCatalog()
+
+# Total count of confirmed exoplanets
+catalog.count()                      # {"count": 5742}
+
+# Retrieve all planets (optionally limit)
+catalog.all_planets(limit=100)      # {"planets": [...], "count": 100}
+
+# Search by name, host star, sky position, radius, period, facility
+catalog.search_by_name("WASP-18 b")
+catalog.search_by_host("WASP-18")
+catalog.search_by_position(26.5, -45.7, radius_deg=10.0)
+catalog.search_by_radius(1.0, 2.0)    # Earth radii
+catalog.search_by_period(0.5, 5.0)   # days
+catalog.search_by_facility("TESS")
+```
+
+Key columns available: planet name, host star, RA/Dec, radius (Earth),
+orbital period, transit depth, TESS magnitude, star radius, discovery
+facility, discovery year, planet mass, eccentricity, equilibrium
+temperature.
+
+#### Local SQLite mirror (offline resilience)
+
+For network outages or deep-space operations, download a complete
+local copy of the exoplanet catalog as a SQLite database. Every search
+method automatically falls back to the mirror when the live TAP API is
+unreachable.
+
+```python
+catalog = ExoplanetCatalog()
+
+# Download the full exoplanet catalog to a local SQLite file
+catalog.download_mirror("~/r1-a1-data/exoplanets.db")
+# {"downloaded": 5742, "db_path": "...", "source": "nasa_archive"}
+
+# Check mirror status
+catalog.mirror_info()
+# {"configured": True, "exists": True, "row_count": 5742,
+#  "last_sync": "2026-08-19T20:15:00", "db_path": "..."}
+
+# Re-sync (re-download and replace) the mirror
+catalog.sync_mirror()
+
+# Every search method falls back automatically when the network is down:
+# catalog.search_by_name("WASP-18 b")  → reads from local mirror
+# catalog.all_planets()                → reads from local mirror
+# catalog.count()                      → reads from local mirror
+```
+
+The mirror stores all 14 catalog columns and supports every search
+method (name, host, position, radius, period, facility, count).
+Searches from the mirror return `"source": "local_mirror"` in the
+result dict so R1-A1 always knows whether it's reading live or cached
+data.
+
+### Exoplanet transit detection (`src/astro/exoplanet.py`)
+
+Runs Box-fitting Least Squares (BLS) transit searches on TESS light
+curves via `lightkurve`. Adapted from the
+[exoplanet-hunter](https://github.com/drwjkirkpatrick-web/exoplanet-hunter)
+project, where it validated WASP-18 b with 0.04% error against known
+parameters.
+
+```python
+from astro.exoplanet import ExoplanetDetector
+
+detector = ExoplanetDetector()
+
+# Full pipeline: download TESS light curve → flatten → BLS transit search
+result = detector.detect_transits(tic_id=100100827)
+# {"period": 3.5246, "duration": 0.089, "depth": 0.0046,
+#  "epoch": 2458325.5, "snr": 12.3, ...}
+
+# Cross-check a detection against the NASA Exoplanet Archive
+detector.validate_known_planet("WASP-18 b")
+```
+
+`lightkurve` and `numpy` are lazily imported — the module loads and
+`info()` works without them installed. Install the optional dependency
+to enable transit detection:
+
+```bash
+pip install -e ".[exoplanet]"    # lightkurve + numpy
+```
+
 ```yaml
 comms:
   enabled: true
@@ -199,7 +304,9 @@ src/
   comms/        GPS, cellular hotspot failover, WiFi router stack
   dashboard/    Flask web dashboard (8 cards + /api/health)
   astro/        celestial navigation, solar system, star catalog,
-                Milky Way structure, astronomical data bridge
+                Milky Way structure, astronomical data bridge,
+                exoplanet catalog (NASA Archive), exoplanet transit
+                detection (BLS on TESS light curves)
   repair/       spacecraft repair framework: registry, diagnostics,
                 repair procedures (extensible)
   motion/       drive, dome, center leg, expressive gaits + awareness refiner
@@ -213,7 +320,7 @@ src/
   audio/        speaker/chirps + mic array
   interconnect/ host↔MCU serial link (with retry) + selftest
 firmware/       Teensy 4.1 MCU sketch (r1a1_mcu.ino) + pin map
-tests/          full pytest suite (hardware-mocked, 351 tests)
+tests/          full pytest suite (hardware-mocked, 390 tests)
 docs/
   HARDWARE.md       compute bay, dome nodes, comms, interconnect map, cooling, chassis
   PARTS.md          complete 3D-printed parts list with design links
@@ -241,6 +348,15 @@ python -m src.dashboard.server         # dashboard on :9298
 
 ## What's new in 0.5.0
 
+- **Exoplanet catalog** (`src/astro/exoplanet_catalog.py`) — live NASA
+  Exoplanet Archive TAP queries: all known planets, search by name,
+  host, sky position, radius, period, facility
+- **Local SQLite mirror** — download the full exoplanet catalog for
+  offline use; every search method auto-falls-back to the mirror when
+  the network is down
+- **Exoplanet transit detection** (`src/astro/exoplanet.py`) — BLS
+  transit search on TESS light curves via lightkurve, with
+  injectable transport and validate-known-planet cross-check
 - **Dome Hermes agent node** (`src/hermesnode/`) — hidden Jetson Nano
   peer hosting the agent layer
 - **LLM keep-alive** (`src/brain/keepalive.py`) — warm-model pings +

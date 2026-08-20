@@ -2,3 +2,5 @@ requests>=2.31
 pyserial>=3.5; platform_system != "Darwin"
 pytest>=8.0
 flask>=3.0; extra == "dashboard"
+lightkurve>=2.4; extra == "exoplanet"
+numpy>=1.26; extra == "exoplanet"
