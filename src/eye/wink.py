@@ -15,8 +15,12 @@ from __future__ import annotations
 from typing import Any, Callable, Union
 
 # MCU channel map (docs/HARDWARE.md §3: PWM ch0-7 -> eye LED, servos).
-EYE_LED_PWM_CHANNEL = 2
-SHUTTER_SERVO_CHANNEL = 3
+# Channel map must match firmware/r1a1_mcu.ino (pwm ch1 = eye LED,
+# servo ch2 = shutter, servo ch3 = gimbal pan) — see F3 in
+# docs/CODE_REVIEW.md and the contract tests in
+# tests/test_protocol_contract.py.
+EYE_LED_PWM_CHANNEL = 1
+SHUTTER_SERVO_CHANNEL = 2
 
 LED_ON_DUTY = 1.0
 LED_OFF_DUTY = 0.0

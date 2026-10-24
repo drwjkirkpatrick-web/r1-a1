@@ -46,6 +46,14 @@ class Beam:
         self.is_on = False
         self.brightness = 1.0
         self._cooldown_timer: Optional[Any] = None
+        # F22: the cooldown callback runs on the timer's thread while
+        # on()/off() run on the caller's thread, and cancel() cannot stop
+        # a callback that has already started. A lock plus a generation
+        # counter makes the cancel-and-relight check-and-set atomic: a
+        # callback that lost the cancel race sees a stale generation and
+        # returns without touching the fan (never "lamp lit, fan off").
+        self._lock = threading.Lock()
+        self._cooldown_gen = 0
 
     # -- properties -------------------------------------------------------
 
@@ -58,26 +66,36 @@ class Beam:
 
     def on(self) -> None:
         """Light the lamp. Cancels any pending fan cooldown."""
-        if self._cooldown_timer is not None:
-            self._cooldown_timer.cancel()
-            self._cooldown_timer = None
-        self._fan_fn(True)
-        self._lamp_fn(True)
-        self.is_on = True
+        with self._lock:
+            self._cooldown_gen += 1  # invalidate any in-flight callback
+            if self._cooldown_timer is not None:
+                self._cooldown_timer.cancel()
+                self._cooldown_timer = None
+            self._fan_fn(True)
+            self._lamp_fn(True)
+            self.is_on = True
 
     def off(self) -> None:
         """Kill the lamp, then run the fan for COOLDOWN_S before stopping it."""
-        self._lamp_fn(False)
-        self.is_on = False
-        if self._cooldown_timer is not None:
-            self._cooldown_timer.cancel()
-        timer = self._timer_factory(COOLDOWN_S, self._cooldown_done)
-        self._cooldown_timer = timer
-        timer.start()
+        with self._lock:
+            self._lamp_fn(False)
+            self.is_on = False
+            self._cooldown_gen += 1
+            gen = self._cooldown_gen
+            if self._cooldown_timer is not None:
+                self._cooldown_timer.cancel()
+            timer = self._timer_factory(
+                COOLDOWN_S, lambda: self._cooldown_done(gen)
+            )
+            self._cooldown_timer = timer
+            timer.start()
 
-    def _cooldown_done(self) -> None:
-        self._cooldown_timer = None
-        self._fan_fn(False)
+    def _cooldown_done(self, gen: int) -> None:
+        with self._lock:
+            if gen != self._cooldown_gen:
+                return  # cancelled/superseded after the timer fired
+            self._cooldown_timer = None
+            self._fan_fn(False)
 
     # -- output -------------------------------------------------------------
 

@@ -21,8 +21,6 @@ for one loaded from a file) does not require touching the engine.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from .registry import SpacecraftRegistry, SpacecraftType, Subsystem
 
 
@@ -317,6 +315,22 @@ class RepairProcedure:
         (``completed_steps``) is a log, not the source of truth for the
         steps — ``self.steps`` is.
         """
+        if self.completed:
+            # Idempotent: a second execute() must not double-log the steps
+            # (steps_completed would exceed steps_total).  Learning
+            # annotation: guard the mutation with the state flag — the
+            # result dict is a pure function of the stored state either way.
+            return {
+                "spacecraft": self.spacecraft_name,
+                "subsystem": self.subsystem_name,
+                "steps_total": len(self.steps),
+                "steps_completed": len(self.completed_steps),
+                "completed": self.completed,
+                "tools_required": list(self.tools_required),
+                "estimated_time_min": self.estimated_time_min,
+                "difficulty": self.difficulty,
+            }
+
         for idx, step in enumerate(self.steps, start=1):
             # In a real implementation each step would dispatch to hardware.
             # Here we simply log completion.
@@ -343,8 +357,9 @@ class RepairProcedure:
         Derives ``steps`` and ``tools_required`` from the subsystem's authored
         repair data.  ``estimated_time_min`` scales with the number of steps
         (5 min per step as a heuristic).  ``difficulty`` is inferred from the
-        subsystem category: weapons and propulsion default to ``"hard"``,
-        hull and shielding to ``"moderate"``, everything else ``"easy"``.
+        subsystem category: propulsion and thermal protection default to
+        ``"hard"``, hull, payload, and life support to ``"moderate"``,
+        everything else ``"easy"``.
 
         Learning annotation
         -------------------

@@ -6,7 +6,7 @@ brain:
   # Host board — determines recommended model defaults and inference backend.
   # Options:
   #   ubuntu_x86  – Minisforum/Beelink Strix Halo, Ubuntu + Ollama (default)
-  #   mac_ultra   – Mac Studio M3 Ultra, MLX backend (512 GB unified memory)
+  #   mac_ultra   – Mac Studio M5 Ultra, MLX backend (up to 512 GB unified memory)
   #   jetson      – NVIDIA Jetson AGX Orin 64 GB, CUDA + TensorRT-LLM
   host_type: "ubuntu_x86"
 
@@ -15,7 +15,7 @@ brain:
   fallback_model: "gemma2:2b"
   vision_model: "moondream:latest"
 
-  # Mac Studio M3 Ultra overrides (set host_type to mac_ultra to use these).
+  # Mac Studio M5 Ultra overrides (set host_type to mac_ultra to use these).
   # MLX backend serves Ollama-compatible API via mlx-vlm / mlx-lm server.
   mac_ultra:
     base_url: "http://localhost:8080"

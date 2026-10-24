@@ -47,9 +47,14 @@ class PowerMonitor:
         return data
 
     def telemetry(self) -> dict:
-        """Full normalized telemetry dict (soc_pct plus any raw fields)."""
+        """Full normalized telemetry dict (soc_pct plus any raw fields).
+
+        Reads the sensor exactly once (F20): soc_pct is clamped from the
+        same _raw() read as the rest of the dict, so the fields can never
+        disagree across two samples.
+        """
         data = self._raw()
-        data["soc_pct"] = self.soc()
+        data["soc_pct"] = max(0.0, min(100.0, float(data["soc_pct"])))
         return data
 
     def soc(self) -> float:

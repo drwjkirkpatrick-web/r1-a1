@@ -47,6 +47,9 @@ def run_selftest(link: SerialLink, timeout: float = 1.0) -> Dict[str, bool]:
         frame = link.recv(timeout=timeout)
         payload = frame.get("payload")
         # Channel is healthy iff the payload carries an explicit boolean.
+        # The key "estop" is contractual (CODE_REVIEW.md F1): firmware
+        # replies and estop_event frames both use it — see
+        # tests/test_protocol_contract.py for the shared schema.
         results["estop"] = isinstance(payload, dict) and isinstance(
             payload.get("estop"), bool
         )

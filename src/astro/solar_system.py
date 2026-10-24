@@ -59,10 +59,15 @@ From these, for a given instant, the position is found by:
 
 == Notes on the "Sun" and "Moon" entries ===============================
 
-The Sun's elements here are the *geocentric* orbital elements of the
-Sun (which mirror Earth's heliocentric orbit): Earth's mean longitude of
-perihelion (102.94 deg) is used for omega, and Earth's mean anomaly and
-daily motion are reused.  Distance is therefore the Earth–Sun distance.
+The Sun's elements here mirror Earth's *heliocentric* orbit: Earth's
+mean longitude of perihelion (102.94 deg) is used for omega, and
+Earth's mean anomaly and daily motion are reused.  Running them through
+the pipeline yields Earth's heliocentric position — the point on the
+sky *opposite* the geocentric Sun — so before the ecliptic→equatorial
+rotation we negate the ecliptic x/y/z components (equivalently, add 180°
+to the ecliptic longitude) to flip the vector from Sun→Earth into
+Earth→Sun.  Without that flip the reported "Sun" position is 180° off,
+exactly antipodal to the real Sun.  Distance is the Earth–Sun distance.
 
 The Moon's entry is a heavily simplified mean-lunar-orbit model: a
 fixed a, e, i, with Omega = omega = M0 = 0 and the sidereal mean daily
@@ -211,8 +216,10 @@ class SolarSystem:
         },
         # Geocentric Sun: mirrors Earth's heliocentric orbit.  The
         # argument of perihelion (102.94 deg) is Earth's mean longitude of
-        # perihelion, so the Sun's apparent path matches Earth's.  LEARN:
-        # the Sun's "distance" is the Earth–Sun distance, ~1 AU.
+        # perihelion.  LEARN: these elements describe the Sun→Earth
+        # vector; planet_position() applies the 180° flip to turn it into
+        # the Earth→Sun (geocentric) direction.  The Sun's "distance" is
+        # the Earth–Sun distance, ~1 AU.
         "Sun": {
             "semi_major_axis_au": 1.0,
             "eccentricity": 0.017,
@@ -514,6 +521,21 @@ class SolarSystem:
             - (sinO * sinw - cosO * cosw * cosi) * yp
         )
         z_ecl = (sini * sinw) * xp + (sini * cosw) * yp
+
+        # 4b. Geocentric flip for the Sun.
+        #
+        # The Sun's elements mirror Earth's heliocentric orbit, so steps
+        # 1–4 produced the Sun→Earth vector (Earth's position as seen
+        # from the Sun).  A geocentric observer needs the opposite
+        # direction, Earth→Sun: negate all three ecliptic components,
+        # which is the same as adding 180° to the ecliptic longitude.
+        # LEARN: omitting this flip leaves the computed "Sun" exactly
+        # antipodal to the real Sun — e.g. at J2000.0 it would report
+        # RA ~6.75 h / Dec +23° instead of RA ~18.75 h / Dec -23°.
+        if body_name == "Sun":
+            x_ecl = -x_ecl
+            y_ecl = -y_ecl
+            z_ecl = -z_ecl
 
         # 5. Ecliptic → equatorial, rotating about the x-axis by the
         #    obliquity of the ecliptic.  LEARN: positive obliquity tips

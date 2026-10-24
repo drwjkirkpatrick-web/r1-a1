@@ -17,7 +17,7 @@ testable with mocks. Reader protocol:
 
 from __future__ import annotations
 
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple
 
 THROTTLE_C = 75.0
 SHUTDOWN_C = 85.0
@@ -55,11 +55,11 @@ class ThermalMonitor:
         self.shutdown_flag: bool = False
         self.full_stop_flag: bool = False
 
-        # Trend tracking: previous host temp + timestamp, for °C/s rate.
-        self._prev_host_c: Optional[float] = None
-        self._prev_host_ts: Optional[float] = None
-        self._prev2_host_c: Optional[float] = None
-        self._last_host_ts: Optional[float] = None
+        # Trend tracking: last two host-zone (temp_c, timestamp) samples,
+        # stored as pairs so the rate's ΔT and Δt always come from the
+        # same interval (F19).
+        self._prev_sample: Optional[Tuple[float, float]] = None
+        self._cur_sample: Optional[Tuple[float, float]] = None
 
     # ------------------------------------------------------------------
     # Reporting
@@ -89,10 +89,8 @@ class ThermalMonitor:
 
     def _record_host_sample(self, host_c: float) -> None:
         """Shift the two-sample host-zone history and append ``host_c``."""
-        self._prev2_host_c = self._prev_host_c
-        self._prev_host_c = host_c
-        self._prev_host_ts = self._last_host_ts
-        self._last_host_ts = self._clock()
+        self._prev_sample = self._cur_sample
+        self._cur_sample = (host_c, self._clock())
 
     def host_rate_c_per_s(self) -> Optional[float]:
         """Rate of host temperature change in °C/s, or None if unknown.
@@ -103,14 +101,14 @@ class ThermalMonitor:
         we can drop to the small model *before* crossing 75 °C, instead
         of reacting after the throttle flag is already latched.
         """
-        if self._prev_host_c is None or self._prev2_host_c is None:
+        if self._prev_sample is None or self._cur_sample is None:
             return None
-        if self._prev_host_ts is None or self._last_host_ts is None:
-            return None
-        dt = self._last_host_ts - self._prev_host_ts
+        prev_c, prev_ts = self._prev_sample
+        cur_c, cur_ts = self._cur_sample
+        dt = cur_ts - prev_ts
         if dt <= 0:
             return None
-        return (self._prev_host_c - self._prev2_host_c) / dt
+        return (cur_c - prev_c) / dt
 
     def battery_c(self) -> float:
         """Current battery-bay temperature (0.0 if no reader wired)."""
@@ -133,7 +131,9 @@ class ThermalMonitor:
         all_ok = True
         for i in range(FAN_COUNT):
             rpm = float(self._fan_tach_reader(i)) if self._fan_tach_reader else 0.0
-            ok = rpm >= MIN_FAN_RPM and self._fan_tach_reader is not None
+            # Strictly greater: MIN_FAN_RPM itself already counts as
+            # stalled/dead per the constant's comment (F18).
+            ok = rpm > MIN_FAN_RPM and self._fan_tach_reader is not None
             fans[i] = {"rpm": rpm, "ok": ok}
             all_ok = all_ok and ok
         return {"ok": all_ok, "fans": fans}

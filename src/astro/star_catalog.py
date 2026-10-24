@@ -69,8 +69,10 @@ class StarCatalog:
     """
 
     #: Master list of 60 real bright stars (apparent V mag < ~2.1, plus a few
-    #: notable fainter ones for navigation utility).  Ordered by descending
-    #: brightness so :meth:`brightest` needs no work in the common case.
+    #: notable fainter ones for navigation utility).  The entries are
+    #: grouped by origin (the 42 stars specified for the R1-A1 build first,
+    #: then additional navigation aids) — *not* sorted by brightness, so
+    #: :meth:`brightest` sorts by magnitude explicitly.
     #:
     #: Each dict has keys:
     #:   name          – conventional proper name (str)
@@ -210,7 +212,9 @@ class StarCatalog:
         # below is a representative *average* apparent magnitude.  Its actual
         # V mag swings between ~3 and ~10 over a 332-day period, so for
         # real-time nav you would query a variable-star ephemeris first.
-        {"name": "Mira", "ra_hours": 34.83, "dec_degrees": -3.00,
+        # learning: Mira's J2000 RA is 34.83 *degrees*, which is 2.32 hours
+        # (34.83 / 15) — RA here must be in hours, 0–24.
+        {"name": "Mira", "ra_hours": 2.32, "dec_degrees": -3.00,
          "magnitude": 2.08, "spectral_type": "M7III",
          "constellation": "Cetus", "distance_ly": 300},
         # --- Additional stars to exceed the 50-star minimum -----------------
@@ -264,6 +268,16 @@ class StarCatalog:
         {"name": "Rigil Kentaurus", "ra_hours": 14.66, "dec_degrees": -60.84,
          "magnitude": -0.27, "spectral_type": "G2V",
          "constellation": "Centaurus", "distance_ly": 4.37},
+        # Mimosa (Beta Crucis) — second-brightest star of the Southern
+        # Cross; with Acrux it anchors southern-hemisphere orientation.
+        {"name": "Mimosa", "ra_hours": 12.80, "dec_degrees": -59.69,
+         "magnitude": 1.25, "spectral_type": "B0.5III",
+         "constellation": "Crux", "distance_ly": 280},
+        # Adhara (Epsilon Canis Majoris) — the brightest source of
+        # ultraviolet radiation in the night sky after Sirius.
+        {"name": "Adhara", "ra_hours": 6.98, "dec_degrees": -28.97,
+         "magnitude": 1.50, "spectral_type": "B2II",
+         "constellation": "Canis Major", "distance_ly": 430},
     ]
 
     # ------------------------------------------------------------------
@@ -332,8 +346,9 @@ class StarCatalog:
         """Return the *n* brightest stars, sorted by ascending magnitude.
 
         In astronomy **lower magnitude = brighter**, so the sort is ascending.
-        The catalog is already ordered by magnitude, but we sort defensively
-        in case entries are added out of order in the future.
+        The master list is *not* stored in magnitude order (entries are
+        grouped by origin), so we always sort by magnitude here rather than
+        relying on list position.
 
         Parameters
         ----------

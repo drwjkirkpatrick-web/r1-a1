@@ -485,6 +485,102 @@ class TestRepairProcedure(unittest.TestCase):
             self.assertIsNotNone(proc)
             self.assertEqual(proc.spacecraft_name, "Space Shuttle")
 
+    def test_execute_is_idempotent(self):
+        """A second execute() must not double-log steps (bug fix)."""
+        from repair.diagnostics import RepairProcedure
+        proc = RepairProcedure(
+            spacecraft_name="Test",
+            subsystem_name="Test sub",
+            steps=["A", "B", "C"],
+            tools_required=[],
+            estimated_time_min=15,
+            difficulty="easy",
+        )
+        first = proc.execute()
+        second = proc.execute()
+        self.assertEqual(first["steps_completed"], first["steps_total"])
+        self.assertEqual(second["steps_completed"], second["steps_total"])
+        self.assertEqual(len(proc.completed_steps), 3)
+
+
+# ─── Repair: New catalog spacecraft (2026-10 research update) ──────────────
+
+
+class TestNewCatalogSpacecraft(unittest.TestCase):
+
+    def setUp(self):
+        from repair.registry import _build_catalog
+        self.registry = _build_catalog()
+
+    NEW_SHIPS = (
+        "Apollo CSM/LM",
+        "Skylab",
+        "Hubble Space Telescope",
+        "International Space Station",
+        "Mir",
+    )
+
+    def test_all_new_ships_registered(self):
+        for name in self.NEW_SHIPS:
+            ship = self.registry.get(name)
+            self.assertIsNotNone(ship, f"{name} missing from catalog")
+            self.assertGreater(len(ship.subsystems), 0)
+
+    def test_catalog_has_eight_ships(self):
+        self.assertEqual(len(self.registry), 8)
+
+    def test_every_subsystem_has_repair_steps(self):
+        # All subsystems of all new ships must have repair steps and
+        # diagnostic checks authored from documented real repairs.
+        for name in self.NEW_SHIPS:
+            for sub in self.registry.get(name).subsystems:
+                self.assertGreater(
+                    len(sub.repair_steps), 0, f"{name}/{sub.name}: no steps"
+                )
+                self.assertGreater(
+                    len(sub.diagnostic_checks), 0,
+                    f"{name}/{sub.name}: no checks",
+                )
+
+    def test_apollo_mailbox_documented(self):
+        ship = self.registry.get("Apollo CSM/LM")
+        o2 = ship.get_subsystem("Service Module oxygen tanks")
+        joined = " ".join(o2.repair_steps)
+        self.assertIn("mailbox", joined)
+
+    def test_skylab_parasol_documented(self):
+        ship = self.registry.get("Skylab")
+        sub = ship.get_subsystem("Micrometeorite shield / thermal control")
+        joined = " ".join(sub.repair_steps)
+        self.assertIn("parasol", joined)
+
+    def test_hubble_costar_documented(self):
+        ship = self.registry.get("Hubble Space Telescope")
+        sub = ship.get_subsystem("Primary mirror / corrective optics")
+        joined = " ".join(sub.repair_steps)
+        self.assertIn("COSTAR", joined)
+
+    def test_iss_cufflink_repair_documented(self):
+        ship = self.registry.get("International Space Station")
+        sub = ship.get_subsystem("P6 solar array")
+        joined = " ".join(sub.repair_steps)
+        self.assertIn("cufflink", joined)
+
+    def test_mir_spektr_isolation_documented(self):
+        ship = self.registry.get("Mir")
+        sub = ship.get_subsystem("Spektr module hull")
+        self.assertEqual(sub.status, "critical")
+        joined = " ".join(sub.repair_steps)
+        self.assertIn("feed-throughs", joined)
+
+    def test_new_ships_diagnosable(self):
+        from repair.diagnostics import DiagnosticEngine
+        engine = DiagnosticEngine(self.registry)
+        for name in self.NEW_SHIPS:
+            result = engine.run_all_checks(name)
+            self.assertEqual(result["spacecraft"], name)
+            self.assertGreater(len(result["subsystems"]), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

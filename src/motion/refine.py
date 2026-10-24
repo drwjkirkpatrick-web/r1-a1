@@ -48,19 +48,27 @@ class MovementRefiner:
                     "detoured": False, "reason": advice["reason"]}
 
         detoured = False
-        if not fusion.grid.raycast_clear(0.0, max(0.5, meters)):
+        lookahead = self._lookahead_m(meters, fusion.grid)
+        if not fusion.grid.raycast_clear(0.0, lookahead):
             # one detour attempt each way, then give up politely.
+            # Each attempt is relative to the ORIGINAL heading: rotate by
+            # the delta from the current detour angle so the second
+            # attempt actually probes the opposite side instead of
+            # landing back on the (known-blocked) original ray.
             # Extra decay per attempt: from the robot's new heading the
             # stale ego-centric cells are less trustworthy, so fade them
             # faster before re-checking the ray.
+            detour_deg = 0.0
             for sign in (+1, -1):
-                self._drive.rotate(sign * DETOUR_DEG)
+                target_deg = sign * DETOUR_DEG
+                self._drive.rotate(target_deg - detour_deg)
+                detour_deg = target_deg
                 for _ in range(4):  # 0.9^4 ≈ 0.66 → 0.9 confidence → ~0.34
                     fusion.grid.decay()
                 state = fusion.refresh()
                 advice = self._policy.advise(state["nearest_m"], state["cliff"])
                 if (not advice["must_stop"]
-                        and fusion.grid.raycast_clear(0.0, max(0.5, meters))):
+                        and fusion.grid.raycast_clear(0.0, lookahead)):
                     detoured = True
                     break
             else:
@@ -78,12 +86,17 @@ class MovementRefiner:
         """One pursuit control step toward an mmWave-tracked target.
 
         Steers toward the target's smoothed position, advancing only to
-        hold ``distance_m`` standoff. Returns {'tracking': bool, ...}.
+        hold ``distance_m`` standoff. The advance passes through the same
+        safety gate as ``refined_forward``: proximity/cliff policy first,
+        then an occupancy raycast along the heading — following a human
+        must not drive blind toward a staircase or wall. Returns
+        {'tracking': bool, 'moved': bool, ...}.
         """
         pos = fusion.mmwave.track(target_id)
         if pos is None:
             drive.stop()
-            return {"tracking": False, "reason": "target lost"}
+            return {"tracking": False, "moved": False,
+                    "reason": "target lost"}
 
         tx, ty = pos
         bearing = math.degrees(math.atan2(ty, tx))
@@ -91,11 +104,46 @@ class MovementRefiner:
 
         if abs(bearing) > 5.0:
             drive.rotate(bearing)
+
+        state = fusion.refresh()
+        advice = self._policy.advise(state["nearest_m"], state["cliff"])
+        if advice["must_stop"]:
+            drive.stop()
+            return {"tracking": True, "moved": False, "distance_m": dist,
+                    "bearing_deg": bearing, "reason": advice["reason"]}
+
+        moved = False
         gap = dist - distance_m
         if gap > 0.1:
-            drive.forward(gap, 0.4)  # gentle pursuit speed
+            lookahead = self._lookahead_m(gap, fusion.grid)
+            if fusion.grid.raycast_clear(0.0, lookahead):
+                # gentle pursuit speed, further scaled by the policy
+                drive.forward(gap, 0.4 * advice["max_speed_factor"])
+                moved = True
+            else:
+                drive.stop()  # pursuit path blocked — hold, report
+                return {"tracking": True, "moved": False,
+                        "distance_m": dist, "bearing_deg": bearing,
+                        "reason": "pursuit path blocked"}
         elif gap < -0.2:
             drive.stop()  # too close — hold position
 
-        return {"tracking": True, "distance_m": dist,
+        return {"tracking": True, "moved": moved, "distance_m": dist,
                 "bearing_deg": bearing}
+
+    # -- internals --------------------------------------------------------
+
+    @staticmethod
+    def _lookahead_m(meters: float, grid) -> float:
+        """Clamp the raycast look-ahead to inside the grid's known bubble.
+
+        The grid spans ``cells * cell_m`` metres across with the robot at
+        its center, and cells outside that radius report as blocked
+        ("unknown = blocked"). Raycasting the full command length would
+        therefore refuse any command that reaches past the grid edge —
+        including one landing exactly on it. Clamp the look-ahead half a
+        cell inside the last known ring: a longer command is checked as
+        far as the sensors can see and proceeds on that evidence.
+        """
+        limit = grid.cells * grid.cell_m / 2.0 - grid.cell_m / 2.0
+        return min(max(0.5, meters), limit)

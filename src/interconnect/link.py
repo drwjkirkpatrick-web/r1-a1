@@ -7,6 +7,13 @@ Each frame is one line containing a single JSON object:
 
 crc is the CRC-32 (zlib polynomial, as returned by ``zlib.crc32``) of the
 byte string ``cmd + str(seq) + json.dumps(payload)`` encoded as UTF-8.
+It is an UNSIGNED 32-bit integer (``zlib.crc32(...) & 0xFFFFFFFF``); the
+firmware parses it with ``strtoul`` — values >= 2**31 are valid.
+
+The full host<->firmware protocol contract (command set, payload keys and
+types, e-stop payload key ``"estop"``, effector channel map) is encoded in
+``tests/test_protocol_contract.py`` — that file is the shared schema and
+must be kept in sync with ``firmware/r1a1_mcu.ino``.
 
 The serial object itself is dependency-injected via ``serial_factory`` so
 the module is fully hardware-mockable. With no factory given, pyserial is

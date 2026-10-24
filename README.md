@@ -1,11 +1,11 @@
 # R1-A1
 
-![Version](https://img.shields.io/badge/version-0.5.0-blue)
-![Tests](https://img.shields.io/badge/tests-390%20passing-brightgreen)
+![Version](https://img.shields.io/badge/version-0.6.0-blue)
+![Tests](https://img.shields.io/badge/tests-672%20passing-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.12+-yellow)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Modules](https://img.shields.io/badge/modules-55-orange)
-![Lines](https://img.shields.io/badge/code-12.5K_LoC-informational)
+![Modules](https://img.shields.io/badge/modules-60-orange)
+![Lines](https://img.shields.io/badge/code-19.8K_LoC-informational)
 ![Brain](https://img.shields.io/badge/brain-Ollama%20%7C%20MLX%20%7C%20CUDA-purple)
 ![Agent Node](https://img.shields.io/badge/agent%20node-Jetson%20Nano%20(dome)-blue)
 ![Dashboard](https://img.shields.io/badge/dashboard-:9298-teal)
@@ -47,12 +47,31 @@ running the Hermes agent layer as a networked peer.
   Archive with 5,000+ confirmed planets), and **exoplanet transit
   detection** (BLS on TESS light curves)
 - 🔧 **Spacecraft repair framework** — extensible diagnostic engine
-  with a spacecraft registry (Crew Dragon, Soyuz MS, Space Shuttle
-  built in), subsystem definitions, failure modes, and repair
-  procedures — add any spacecraft type later
-- 🍎 **Mac Studio M3 Ultra option** — operators can swap to a 512 GB
-  Mac Studio M3 Ultra brain via one config line (`host_type: mac_ultra`),
-  unlocking 70B+ models at full precision via the MLX backend
+  with a spacecraft registry (8 real spacecraft built in: Crew Dragon,
+  Soyuz MS, Space Shuttle, Apollo CSM/LM, Skylab, Hubble, ISS, and Mir),
+  subsystem definitions, failure modes, and repair procedures grounded
+  in documented real repairs — Apollo 13's CO2 mailbox, Skylab's parasol
+  sunshade, Hubble's COSTAR, the ISS cufflink-sutured solar array, and
+  Mir's Spektr isolation (research: `docs/SPACECRAFT_REPAIR_RESEARCH.md`)
+- 🤝 **Loyalty engine** — operator profiles with saturating familiarity,
+  five bond levels (WARY → DEVOTED), neglect decay, loyalty-adjusted
+  request priority, and protective alerts for trusted operators
+- 🛠 **Tool bay** — 8 astromech tools (arc welder, scomp link, fusion
+  cutter…) with charge/wear, weight-limited rack, and best-tool
+  selection + service plans per repair subsystem
+- 📋 **Mission queue** — prioritized missions with dependency chains,
+  deadline tracking, failure cascades, and progress reports
+- 🎪 **Quirk registry** — unwiped astromechs develop quirks: 10 themed
+  quirks across 5 categories, deterministic acquisition, memory-wipe
+  removal rules, and a wipe-refusal probability that grows with age
+- 🦺 **Safety controller** — 7 hazard types, 4-band escalation ladder,
+  ordered emergency response plans, per-system interlocks, and alarm
+  hysteresis so relays never flap
+- 🍎 **Mac Studio M5 Ultra option** — operators can swap to a Mac Studio
+  (2026, M5 Max or M5 Ultra — Apple's newest and most powerful Macs,
+  up to 512 GB unified memory on the 80-core-GPU Ultra) brain via one
+  config line (`host_type: mac_ultra`), unlocking 70B+ models at full
+  precision via the MLX backend
 - 🎭 **Remedy personalities** — optional Hermes remedy personality
   overlay (100 remedies) shapes the agent's temperament and voice
 - 🧬 **Limbic system** — optional Hermes affective state engine gives
@@ -100,7 +119,7 @@ running the Hermes agent layer as a networked peer.
 | `host_type` | Board | RAM | Backend | Max model |
 |---|---|---|---|---|
 | `ubuntu_x86` (default) | Strix Halo mini PC | 128 GB | Ollama | 70B Q4 |
-| `mac_ultra` | Mac Studio M3 Ultra | 512 GB | MLX | 405B Q4 / 70B FP |
+| `mac_ultra` | Mac Studio M5 Max / M5 Ultra (2026) | up to 512 GB | MLX | 405B Q4 / 70B FP |
 | `jetson` | Jetson AGX Orin 64 GB | 64 GB | Ollama | 20B Q4 |
 
 Set in `config/r1a1.yaml` — the brain code is host-agnostic and talks to
@@ -307,8 +326,13 @@ src/
                 Milky Way structure, astronomical data bridge,
                 exoplanet catalog (NASA Archive), exoplanet transit
                 detection (BLS on TESS light curves)
-  repair/       spacecraft repair framework: registry, diagnostics,
-                repair procedures (extensible)
+  repair/       spacecraft repair framework: registry (8 real
+                spacecraft), diagnostics, repair procedures (extensible)
+  loyalty/      operator profiles, bond levels, loyalty-adjusted priority
+  tools/        astromech tool bay: tool types, charge/wear, service plans
+  missions/     mission queue: priorities, dependency chains, deadlines
+  quirks/       droid quirk registry: acquisition, wipe rules, refusal
+  safety/       hazard assessment, escalation, interlocks, hysteresis
   motion/       drive, dome, center leg, expressive gaits + awareness refiner
   awareness/    mmWave, ultrasonic, cliff, pose, occupancy, proximity,
                 fusion, watchdog
@@ -320,7 +344,7 @@ src/
   audio/        speaker/chirps + mic array
   interconnect/ host↔MCU serial link (with retry) + selftest
 firmware/       Teensy 4.1 MCU sketch (r1a1_mcu.ino) + pin map
-tests/          full pytest suite (hardware-mocked, 390 tests)
+tests/          full pytest suite (hardware-mocked, 672 tests)
 docs/
   HARDWARE.md       compute bay, dome nodes, comms, interconnect map, cooling, chassis
   PARTS.md          complete 3D-printed parts list with design links
@@ -345,6 +369,21 @@ python -m src.cli chat             # talk to the brain from the shell
 python -m src.interconnect.selftest   # bench link check (needs MCU)
 python -m src.dashboard.server         # dashboard on :9298
 ```
+
+## What's new in 0.6.0
+
+- **Five new astromech modules** — `loyalty` (operator bonds),
+  `tools` (tool bay), `missions` (task queue), `quirks` (unwiped-droid
+  personality drift), `safety` (hazard response + interlocks)
+- **Repair registry expanded to 8 real spacecraft** — Apollo CSM/LM,
+  Skylab, Hubble, ISS, and Mir join Crew Dragon, Soyuz MS, and Shuttle,
+  with failure modes and repair steps grounded in documented events
+  (research dossier: `docs/SPACECRAFT_REPAIR_RESEARCH.md`)
+- **RepairProcedure.execute() idempotence fix** — re-running a
+  procedure no longer double-logs steps
+- **Code review** — full-project review report in `docs/CODE_REVIEW.md`
+- **Mac brain option updated** — `mac_ultra` now reflects Apple's 2026
+  Mac Studio (M5 Max / M5 Ultra, up to 512 GB unified memory)
 
 ## What's new in 0.5.0
 
@@ -386,6 +425,8 @@ python -m src.dashboard.server         # dashboard on :9298
 - [docs/GAP_ANALYSIS.md](docs/GAP_ANALYSIS.md) — astromech knowledge domain gap analysis
 - [docs/BUILD.md](docs/BUILD.md) — build sequence with safety gates
 - [docs/PROMPTS.md](docs/PROMPTS.md) — 42 acceptance prompts
+- [docs/SPACECRAFT_REPAIR_RESEARCH.md](docs/SPACECRAFT_REPAIR_RESEARCH.md) — documented real-spacecraft repair research driving the registry
+- [docs/CODE_REVIEW.md](docs/CODE_REVIEW.md) — full-project code review report
 
 ## License
 

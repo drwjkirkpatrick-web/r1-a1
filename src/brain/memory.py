@@ -67,7 +67,11 @@ class Memory:
             "turns": [list(t) for t in self.turns],
         }
         tmp = self.persist_path + ".tmp"
-        os.makedirs(os.path.dirname(self.persist_path), exist_ok=True)
+        # F21: a bare filename ("memory.json") has an empty dirname;
+        # os.makedirs("") raises FileNotFoundError.
+        dir_name = os.path.dirname(self.persist_path)
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
         with open(tmp, "w", encoding="utf-8") as fh:
             json.dump(data, fh, indent=2)
         os.replace(tmp, self.persist_path)

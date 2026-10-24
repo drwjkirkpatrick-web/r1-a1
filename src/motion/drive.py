@@ -77,17 +77,26 @@ class Drive:
     def estop_soft(self):
         """Soft emergency stop.
 
-        Sends drive.stop and verifies the send completed within the
-        100 ms budget. Latches estop_latched regardless of outcome;
-        motion commands are refused until the latch is cleared.
+        Latches estop_latched FIRST — a failed e-stop must fail closed,
+        so the latch is set before the stop command is even attempted.
+        Then sends drive.stop and verifies the send completed within
+        the 100 ms budget. Motion commands are refused until the latch
+        is cleared.
 
-        Raises EstopTimeoutError if the budget was exceeded (the stop
-        was still sent — the flag and exception report the lateness).
+        Raises EstopTimeoutError if the send itself raised (link down;
+        the original error is chained as the cause) or if the budget
+        was exceeded (the stop was still sent — the flag and exception
+        report the lateness). The latch holds either way.
         """
-        t0 = self._clock()
-        self.link.send("drive.stop", {})
-        elapsed = self._clock() - t0
         self.estop_latched = True
+        t0 = self._clock()
+        try:
+            self.link.send("drive.stop", {})
+        except Exception as exc:
+            raise EstopTimeoutError(
+                f"soft e-stop send failed (latched locally): {exc}"
+            ) from exc
+        elapsed = self._clock() - t0
         if elapsed > self.ESTOP_BUDGET_S:
             raise EstopTimeoutError(
                 f"soft e-stop send took {elapsed * 1000:.1f} ms "

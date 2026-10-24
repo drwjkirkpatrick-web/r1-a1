@@ -35,6 +35,9 @@ def doctor() -> int:
             status = fn()
         except Exception as exc:  # noqa: BLE001 — doctor must never crash
             status = f"ERROR: {exc}"
+        # A check can fail two ways: raising (caught above) or returning a
+        # "FAIL …"/"ERROR …" status string. Both must fail the run (F14).
+        if status.startswith(("FAIL", "ERROR")):
             ok = False
         print(f"{name:>14}: {status}")
     return 0 if ok else 1
@@ -142,10 +145,10 @@ def _start_dashboard() -> int:
 def _show_config() -> int:
     """Print the current config."""
     import os
-    config_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-        "config", "r1a1.yaml"
-    )
+    # src/cli.py -> repo root is two dirname() hops (F13: three hops landed
+    # at the *parent* of the project root, so `r1a1 config` never found it).
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    config_path = os.path.join(repo_root, "config", "r1a1.yaml")
     if not os.path.exists(config_path):
         print(f"Config file not found: {config_path}", file=sys.stderr)
         return 1

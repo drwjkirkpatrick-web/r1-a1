@@ -1,6 +1,12 @@
+# Core dependencies for the R1-A1 host software.
 requests>=2.31
 pyserial>=3.5; platform_system != "Darwin"
 pytest>=8.0
-flask>=3.0; extra == "dashboard"
-lightkurve>=2.4; extra == "exoplanet"
-numpy>=1.26; extra == "exoplanet"
+
+# Optional stacks live in their own files (F23): environment markers like
+# `extra == "dashboard"` are NOT valid in a plain requirements file — the
+# `extra` marker is only defined in package metadata, so pip silently
+# skipped those lines and the optional deps never installed.
+#
+#   pip install -r requirements-dashboard.txt   # web dashboard (Flask)
+#   pip install -r requirements-exoplanet.txt   # exoplanet pipeline

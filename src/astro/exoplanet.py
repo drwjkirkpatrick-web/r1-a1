@@ -684,9 +684,9 @@ class ExoplanetDetector:
         """Cross-check a detection against the NASA Exoplanet Archive.
 
         Queries the :class:`ExoplanetCatalog` (from the sibling
-        ``star_catalog`` module) for the known parameters of a confirmed
-        exoplanet, so a detected transit can be compared against the
-        literature values for period, depth, and epoch.
+        ``exoplanet_catalog`` module) for the known parameters of a
+        confirmed exoplanet, so a detected transit can be compared against
+        the literature values for period, depth, and epoch.
 
         Parameters
         ----------
@@ -704,28 +704,40 @@ class ExoplanetDetector:
         try:
             # learning: the NASA Exoplanet Archive (NEA) is the canonical
             # community database of confirmed exoplanets.  We delegate to
-            # the sibling ExoplanetCatalog class (in star_catalog.py) which
-            # wraps the NEA's TAP (Table Access Protocol) API.  The import
-            # is lazy so this module doesn't hard-depend on the catalog at
-            # import time — if the catalog module is renamed or refactored,
-            # only this method (not the whole module) breaks.
+            # the sibling ExoplanetCatalog class (in exoplanet_catalog.py)
+            # which wraps the NEA's TAP (Table Access Protocol) API.  The
+            # import is lazy so this module doesn't hard-depend on the
+            # catalog at import time — if the catalog module is renamed or
+            # refactored, only this method (not the whole module) breaks.
+            # A relative import is used so the lookup works regardless of
+            # how the package root happens to be named on sys.path.
             try:
-                from astro.star_catalog import ExoplanetCatalog  # noqa: F401
+                from .exoplanet_catalog import ExoplanetCatalog
             except ImportError:
                 # learning: if the catalog module isn't available (e.g. it
                 # hasn't been written yet, or the package path differs), we
                 # fall back to a direct TAP query so validation still works.
                 return self._query_exoplanet_archive(planet_name)
 
-            catalog = ExoplanetCatalog()  # type: ignore[name-defined]
-            result = catalog.lookup(planet_name)
+            catalog = ExoplanetCatalog()
+            # learning: the catalog's name query is search_by_name(); it
+            # returns the planet dict on success, {"found": False} when
+            # the name matches nothing, or an error dict on failure.
+            result = catalog.search_by_name(planet_name)
             if isinstance(result, dict) and "error" in result:
                 return {
                     "planet": str(planet_name),
                     "found": False,
                     "error": result["error"],
                     "type": result.get("type", "CatalogError"),
-                    "detail": "ExoplanetCatalog lookup returned an error",
+                    "detail": "ExoplanetCatalog search_by_name returned an error",
+                }
+            if isinstance(result, dict) and result.get("found") is False:
+                return {
+                    "planet": str(planet_name),
+                    "found": False,
+                    "known_params": {},
+                    "source": "NASA Exoplanet Archive via ExoplanetCatalog",
                 }
             return {
                 "planet": str(planet_name),

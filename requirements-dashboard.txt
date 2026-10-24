@@ -1,0 +1,3 @@
+# Optional: web dashboard (src/dashboard). Install with:
+#   pip install -r requirements-dashboard.txt
+flask>=3.0
